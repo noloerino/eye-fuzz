@@ -7,7 +7,10 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <style>
         th, td {
-            border: 1px solid
+            border: 0.01em solid;
+        }
+        button {
+            margin-bottom: 0.5em;
         }
     </style>
 </head>
@@ -18,16 +21,19 @@
             <tr>
                 <!-- EI -->
                 <td>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th scope="col">ExecutionIndex</th>
-                                <th scope="col">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="eiTableBody">
-                        </tbody>
-                    </table>
+                    <form id="rerunGenForm" method="POST" action="http://localhost:8000/generator">
+                        <button type="submit">Rerun generator</button>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">ExecutionIndex</th>
+                                    <th scope="col">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eiTableBody">
+                            </tbody>
+                        </table>
+                    </form>
                 </td>
                 <!-- Generator -->
                 <td>
