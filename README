@@ -1,0 +1,6 @@
+# eye-fuzz
+A tool for visualizing the relationship between generator inputs and code coverage.
+
+## Plan
+Plan: run socket in Java to run fuzzing loop (may require threading stuff)
+Have client connect to said socket to display stuff
