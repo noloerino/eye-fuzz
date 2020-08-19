@@ -4,6 +4,7 @@ let coverageStale = false;
 
 let eiTableBody;
 let genTableBody;
+let genContentCell;
 let covTableBody;
 let rerunGenForm;
 
@@ -11,6 +12,7 @@ window.onload = () => {
     rerunGenForm = document.getElementById("rerunGenForm");
     eiTableBody = document.getElementById("eiTableBody");
     genTableBody = document.getElementById("generatorTableBody");
+    genContentCell = document.getElementById("genContentCell");
     covTableBody = document.getElementById("coverageTableBody");
     init();
 };
@@ -40,10 +42,6 @@ let init = function () {
         cell1.appendChild(dataInput);
     }
 
-    let genRow = genTableBody.insertRow(-1);
-    let genCell = genRow.insertCell(0);
-    genCell.innerText = genOutput;
-
     for (let entry of covTableData) {
         let newRow = covTableBody.insertRow(-1); // at end of table
         let cell0 = newRow.insertCell(0);
@@ -51,9 +49,9 @@ let init = function () {
     }
 
     let req = new XMLHttpRequest();
-    req.open("GET", "http://localhost:8000/generator", false);
+    req.open("GET", "http://localhost:8000/generator");
     req.onreadystatechange = () => {
-        if(req.readyState === XMLHttpRequest.DONE) {
+        if (req.readyState === XMLHttpRequest.DONE) {
             let status = req.status;
             if (status === 0 || (status >= 200 && status < 400)) {
                 genOutput = req.responseText;
@@ -61,6 +59,8 @@ let init = function () {
                 genOutput = "ERROR";
             }
         }
+        genContentCell.innerText = genOutput;
+        console.log("received output: " + genOutput)
     };
     req.send();
 };

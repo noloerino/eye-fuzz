@@ -1,5 +1,6 @@
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
+import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.*;
@@ -15,6 +16,7 @@ import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException;
 import edu.berkeley.cs.jqf.fuzz.guidance.Result;
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom;
+import edu.berkeley.cs.jqf.fuzz.junit.GuidedFuzzing;
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness;
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus;
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop;
@@ -35,10 +37,8 @@ public class Server {
     private static final JavaScriptCodeGenerator jsGen = new JavaScriptCodeGenerator();
 
     private static void init() {
+        System.setProperty("jqf.repro.logUniqueBranches", "true");
         System.setProperty("jqf.traceGenerators", "true");
-        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack);
-        String className = jsGen.getClass().getName();
-        SingleSnoop.startSnooping( className + "#" + "generate");
         runGenerator();
     }
 
@@ -48,24 +48,35 @@ public class Server {
      * https://github.com/rohanpadhye/JQF/blob/0152e82d4eb414b06438dec3ef0322135318291a/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java#L159
      */
     private static void runGenerator() {
-        StreamBackedRandom randomFile = new StreamBackedRandom(genGuidance.getInput(), Long.BYTES);
-        SourceOfRandomness random = new FastSourceOfRandomness(randomFile);
-        GenerationStatus genStatus = new NonTrackingGenerationStatus(random);
-        genContents = jsGen.generate(random, genStatus);
+        genGuidance.reset();
+        GuidedFuzzing.run(
+                DummyTest.class,
+                "testWithGenerator",
+                genGuidance,
+                null
+        );
+        genContents = DummyTest.generated;
+        System.out.println("generator produced: " + genContents);
     }
 
     /**
      * Analogous to a ExecutionIndexGuidance, but is backed by the above eiMap.
      * Needs to record coverage for EI to work.
+     * Run only once.
      */
     private static class EiManualMutateGuidance implements Guidance {
         private Thread appThread = null; // Ensures only one thread
         private TraceEvent lastEvent = null;
         private ExecutionIndexingState eiState = new ExecutionIndexingState();
+        private boolean hasRun = false;
+
+        public void reset() {
+            hasRun = true;
+            eiState = new ExecutionIndexingState();
+        }
 
         @Override
         public InputStream getInput() throws IllegalStateException, GuidanceException {
-            eiState = new ExecutionIndexingState();
             return new InputStream() {
                 @Override
                 public int read() {
@@ -85,11 +96,13 @@ public class Server {
 
         @Override
         public boolean hasInput() {
-            return true;
+            return !hasRun;
         }
 
         @Override
-        public void handleResult(Result result, Throwable throwable) throws GuidanceException { }
+        public void handleResult(Result result, Throwable throwable) throws GuidanceException {
+            hasRun = true;
+        }
 
         @Override
         public Consumer<TraceEvent> generateCallBack(Thread thread) {
@@ -114,9 +127,12 @@ public class Server {
         server.createContext("/generator", httpExchange -> {
             System.out.println("Hit /generator");
             String method = httpExchange.getRequestMethod();
+            Headers headers = httpExchange.getResponseHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods","GET,POST");
             switch (method) {
                 case "GET":
-                    httpExchange.sendResponseHeaders(501, genContents.length());
+                    httpExchange.sendResponseHeaders(200, genContents.length());
                     try (OutputStream out = httpExchange.getResponseBody()) {
                         out.write(genContents.getBytes());
                     }
