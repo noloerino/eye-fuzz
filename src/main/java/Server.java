@@ -1,22 +1,30 @@
+import com.pholser.junit.quickcheck.generator.GenerationStatus;
+import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.function.Consumer;
 
 import com.sun.net.httpserver.HttpServer;
+import edu.berkeley.cs.jqf.examples.js.JavaScriptCodeGenerator;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndexingState;
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException;
 import edu.berkeley.cs.jqf.fuzz.guidance.Result;
-import edu.berkeley.cs.jqf.fuzz.junit.GuidedFuzzing;
+import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom;
+import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness;
+import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus;
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop;
+import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent;
+import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
 
 /**
@@ -26,9 +34,10 @@ import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
  */
 public class Server {
     private static LinkedHashMap<ExecutionIndex, Integer> eiMap = new LinkedHashMap<>();
-    private static String genContents = "";
     private static Random rng = new Random();
     private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance();
+    private static final JavaScriptCodeGenerator jsGen = new JavaScriptCodeGenerator();
+    private static String genContents;
 
     public static void main(String[] args) throws IOException {
         init();
@@ -51,7 +60,7 @@ public class Server {
 
             @Override
             public String onPost(BufferedReader reader) throws IOException {
-                // PUT expects parameters in a similar fashion, i.e. each line is int, space, EI array
+                // POST expects parameters in a similar fashion, i.e. each line is int, space, EI array
                 LinkedHashMap<ExecutionIndex, Integer> newEiMap = new LinkedHashMap<>();
                 for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                     String[] chunks = line.replace(",", "")
@@ -64,6 +73,7 @@ public class Server {
                         eiArr[i - 1] = Integer.parseInt(chunks[i].trim());
                     }
                     newEiMap.put(new ExecutionIndex(eiArr), data);
+                    System.out.println(Arrays.toString(eiArr));
                 }
                 eiMap = newEiMap;
                 return "OK";
@@ -73,14 +83,15 @@ public class Server {
                 new ResponseHandler("generator") {
                     @Override
                     public String onGet() {
-                        return genContents;
+                        return getGenContents();
                     }
 
                     @Override
-                    public String onPost(BufferedReader reader) throws IOException {
+                    public String onPost(BufferedReader reader) {
                         // Rerun the generator and return the contents
                         runGenerator();
-                        return genContents;
+                        System.out.println("Updated generator contents (map is of size " + eiMap.size() + ")");
+                        return getGenContents();
                     }
                 });
         server.createContext("/coverage",
@@ -97,7 +108,22 @@ public class Server {
 
     private static void init() {
         System.setProperty("jqf.traceGenerators", "true");
+        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack);
+//        String target = JavaScriptCodeGenerator.class.getName() + "#generate";
+        String target = Server.class.getName() + "#dummy";
+        SingleSnoop.startSnooping(target);
+        System.out.println(SingleSnoop.entryPoints);
+        // Needed for some jank call tracking
+        dummy();
+        System.out.println("Initial map is of size " + eiMap.size());
+    }
+
+    private static void dummy() {
         runGenerator();
+    }
+
+    private static String getGenContents() {
+        return genContents.substring(0, Math.min(genContents.length(), 1024));
     }
 
     /**
@@ -107,22 +133,11 @@ public class Server {
      */
     private static void runGenerator() {
         genGuidance.reset();
-        Guidance g = genGuidance;
-        // Sanity check for instrumentation
-//        try {
-//            g = new ExecutionIndexingGuidance(
-//                    "testWithGenerator", Duration.ofSeconds(5), new File("target"));
-//        } catch (IOException ignored) {
-//            g = null;
-//        }
-        GuidedFuzzing.run(
-                DummyTest.class,
-                "testWithGenerator",
-                g,
-                null
-        );
-        genContents = DummyTest.generated;
-        System.out.println("generator produced: " + genContents);
+        StreamBackedRandom randomFile = new StreamBackedRandom(genGuidance.getInput(), Long.BYTES);
+        SourceOfRandomness random = new FastSourceOfRandomness(randomFile);
+        GenerationStatus genStatus = new NonTrackingGenerationStatus(random);
+        genContents = jsGen.generate(random, genStatus);
+        System.out.println("generator produced: " + getGenContents());
     }
 
     /**
@@ -138,11 +153,11 @@ public class Server {
 
         public void reset() {
             hasRun = false;
-            eiState = new ExecutionIndexingState();
         }
 
         @Override
         public InputStream getInput() throws IllegalStateException, GuidanceException {
+            eiState = new ExecutionIndexingState();
             return new InputStream() {
                 @Override
                 public int read() {
@@ -183,9 +198,24 @@ public class Server {
             return this::handleEvent;
         }
 
+        private boolean isTracking = false;
+
         private void handleEvent(TraceEvent e) {
+            if (e instanceof CallEvent) {
+                if (((CallEvent) e).getInvokedMethodName().equals("dummy")) {
+                    isTracking = true;
+                }
+//                System.out.println("CALL: " + e.getContainingClass() + "#" + e.getContainingMethodName() + " --> " + ((CallEvent) e).getInvokedMethodName());
+            } else if (e instanceof ReturnEvent) {
+                if (e.getContainingMethodName().equals("dummy")) {
+                    isTracking = false;
+                }
+//                System.out.println("RET: " + e.getContainingClass() + "#" + e.getContainingMethodName());
+            }
             lastEvent = e;
-            e.applyVisitor(eiState);
+            if (isTracking) {
+                e.applyVisitor(eiState);
+            }
         }
     }
 
@@ -198,23 +228,34 @@ public class Server {
 
         @Override
         public final void handle(HttpExchange httpExchange) throws IOException {
-            System.out.println("Hit /" + name);
             String method = httpExchange.getRequestMethod();
             Headers headers = httpExchange.getResponseHeaders();
+            System.out.println(method + " /" + name);
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods","GET,POST");
+            headers.add("Access-Control-Allow-Methods","GET,POST,OPTIONS");
+//            headers.add("Access-Control-Allow-Headers","Access-Control-Allow-Origin,Content-Type");
             String response = "";
             switch (method) {
                 case "GET":
                     response = onGet();
-                    httpExchange.sendResponseHeaders(200, response.length());
+                    if (response.length() == 0) {
+                        httpExchange.sendResponseHeaders(204, -1);
+                    } else {
+                        httpExchange.sendResponseHeaders(200, response.length());
+                    }
                     break;
                 case "POST":
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()))) {
                         response = onPost(reader);
                     }
-                    httpExchange.sendResponseHeaders(200, response.length());
+                    if (response.length() == 0) {
+                        httpExchange.sendResponseHeaders(204, -1);
+                    } else {
+                        httpExchange.sendResponseHeaders(200, response.length());
+                    }
                     break;
+                case "OPTIONS":
+                    httpExchange.sendResponseHeaders(204, -1);
                 default:
                     httpExchange.sendResponseHeaders(501, 0);
             }
