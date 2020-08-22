@@ -4,3 +4,11 @@ A tool for visualizing the relationship between generator inputs and code covera
 ## Plan
 Plan: run socket in Java to run fuzzing loop (may require threading stuff)
 Have client connect to said socket to display stuff
+
+## JVM flags to paste into Intellij
+Assuming JQF is built from source in parent dir:
+```
+-Xbootclasspath/a:"../JQF/instrument/target/classes:../JQF/instrument/target/jqf-instrument-1.6-SNAPSHOT.jar:../JQF/instrument/target/dependency/asm-8.0.1.jar"
+-javaagent:"../JQF/instrument/target/jqf-instrument-1.6-SNAPSHOT.jar"
+-Djanala.conf="../JQF/scripts/janala.conf"
+```

@@ -1,24 +1,21 @@
-import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.function.Consumer;
 
-import edu.berkeley.cs.jqf.examples.js.JavaScriptCodeGenerator;
+import com.sun.net.httpserver.HttpServer;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndexingState;
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException;
 import edu.berkeley.cs.jqf.fuzz.guidance.Result;
-import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom;
 import edu.berkeley.cs.jqf.fuzz.junit.GuidedFuzzing;
-import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness;
-import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus;
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
 
@@ -33,11 +30,72 @@ public class Server {
     private static Random rng = new Random();
     private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance();
 
-    // CHANGE THIS FOR OTHER TARGETS
-    private static final JavaScriptCodeGenerator jsGen = new JavaScriptCodeGenerator();
+    public static void main(String[] args) throws IOException {
+        init();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 8000), 0);
+        server.createContext("/ei", new ResponseHandler("ei") {
+            @Override
+            public String onGet() {
+                // For ease of parsing, we send the random byte first followed by a space; everything after the space
+                // is the stack trace of the EI
+                StringBuilder sb = new StringBuilder();
+                for (Map.Entry<ExecutionIndex, Integer> entry : eiMap.entrySet()) {
+                    sb.append(entry.getValue());
+                    sb.append(" ");
+                    ExecutionIndex ei = entry.getKey();
+                    sb.append(ei.toString());
+                    sb.append("\n");
+                }
+                return sb.toString();
+            }
+
+            @Override
+            public String onPost(BufferedReader reader) throws IOException {
+                // PUT expects parameters in a similar fashion, i.e. each line is int, space, EI array
+                LinkedHashMap<ExecutionIndex, Integer> newEiMap = new LinkedHashMap<>();
+                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                    String[] chunks = line.replace(",", "")
+                            .replace("[", "")
+                            .replace("]", "")
+                            .split(" ");
+                    int data = Integer.parseInt(chunks[0]);
+                    int[] eiArr = new int[chunks.length - 1];
+                    for (int i = 1; i < chunks.length; i++) {
+                        eiArr[i - 1] = Integer.parseInt(chunks[i].trim());
+                    }
+                    newEiMap.put(new ExecutionIndex(eiArr), data);
+                }
+                eiMap = newEiMap;
+                return "OK";
+            }
+        });
+        server.createContext("/generator",
+                new ResponseHandler("generator") {
+                    @Override
+                    public String onGet() {
+                        return genContents;
+                    }
+
+                    @Override
+                    public String onPost(BufferedReader reader) throws IOException {
+                        // Rerun the generator and return the contents
+                        runGenerator();
+                        return genContents;
+                    }
+                });
+        server.createContext("/coverage",
+                new ResponseHandler("coverage") {
+                    @Override
+                    public String onGet() {
+                        return "";
+                    }
+                }
+        );
+        server.start();
+        System.out.println("Server initialized at port " + server.getAddress().getPort());
+    }
 
     private static void init() {
-        System.setProperty("jqf.repro.logUniqueBranches", "true");
         System.setProperty("jqf.traceGenerators", "true");
         runGenerator();
     }
@@ -49,10 +107,18 @@ public class Server {
      */
     private static void runGenerator() {
         genGuidance.reset();
+        Guidance g = genGuidance;
+        // Sanity check for instrumentation
+//        try {
+//            g = new ExecutionIndexingGuidance(
+//                    "testWithGenerator", Duration.ofSeconds(5), new File("target"));
+//        } catch (IOException ignored) {
+//            g = null;
+//        }
         GuidedFuzzing.run(
                 DummyTest.class,
                 "testWithGenerator",
-                genGuidance,
+                g,
                 null
         );
         genContents = DummyTest.generated;
@@ -71,7 +137,7 @@ public class Server {
         private boolean hasRun = false;
 
         public void reset() {
-            hasRun = true;
+            hasRun = false;
             eiState = new ExecutionIndexingState();
         }
 
@@ -114,54 +180,63 @@ public class Server {
             if (entryPoint == null) {
                 throw new IllegalStateException("Guidance must be able to determine entry point");
             }
-            return e -> {
-                lastEvent = e;
-                e.applyVisitor(eiState);
-            };
+            return this::handleEvent;
+        }
+
+        private void handleEvent(TraceEvent e) {
+            lastEvent = e;
+            e.applyVisitor(eiState);
         }
     }
 
-    public static void main(String[] args) throws IOException {
-        init();
-        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 8000), 0);
-        server.createContext("/generator", httpExchange -> {
-            System.out.println("Hit /generator");
+    private static abstract class ResponseHandler implements HttpHandler  {
+        private String name;
+
+        public ResponseHandler(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public final void handle(HttpExchange httpExchange) throws IOException {
+            System.out.println("Hit /" + name);
             String method = httpExchange.getRequestMethod();
             Headers headers = httpExchange.getResponseHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
             headers.add("Access-Control-Allow-Methods","GET,POST");
+            String response = "";
             switch (method) {
                 case "GET":
-                    httpExchange.sendResponseHeaders(200, genContents.length());
-                    try (OutputStream out = httpExchange.getResponseBody()) {
-                        out.write(genContents.getBytes());
-                    }
+                    response = onGet();
+                    httpExchange.sendResponseHeaders(200, response.length());
                     break;
                 case "POST":
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()))) {
-                        for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                            System.out.println("BEGIN POST BODY");
-                            System.out.println(line);
-                            System.out.println("END POST BODY");
-                        }
+                        response = onPost(reader);
                     }
-                    String response = "OK";
                     httpExchange.sendResponseHeaders(200, response.length());
-                    try (OutputStream out = httpExchange.getResponseBody()) {
-                        out.write(response.getBytes());
-                    }
                     break;
                 default:
                     httpExchange.sendResponseHeaders(501, 0);
             }
+            try (OutputStream out = httpExchange.getResponseBody()) {
+                out.write(response.getBytes());
+            }
             httpExchange.close();
-        });
-        server.createContext("/coverage", httpExchange -> {
-            System.out.println("Hit /coverage");
-            httpExchange.sendResponseHeaders(501, 0);
-            httpExchange.close();
-        });
-        server.start();
-        System.out.println("Server initialized at port " + server.getAddress().getPort());
+        }
+
+        /**
+         * @return the string to be written as a response
+         */
+        public String onGet() {
+            return "";
+        }
+
+        /**
+         * @param reader the request body
+         * @return the string to be written as a response
+         */
+        public String onPost(BufferedReader reader) throws IOException {
+            return "";
+        }
     }
 }
