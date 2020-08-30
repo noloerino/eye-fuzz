@@ -13,7 +13,6 @@ import java.util.Random;
 import java.util.function.Consumer;
 
 import com.sun.net.httpserver.HttpServer;
-import edu.berkeley.cs.jqf.examples.js.JavaScriptCodeGenerator;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndexingState;
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
@@ -220,7 +219,7 @@ public class Server {
     }
 
     private static abstract class ResponseHandler implements HttpHandler  {
-        private String name;
+        private final String name;
 
         public ResponseHandler(String name) {
             this.name = name;
