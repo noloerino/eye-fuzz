@@ -6,15 +6,11 @@ import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Consumer;
 
 import com.sun.net.httpserver.HttpServer;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex;
-import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndexingState;
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException;
 import edu.berkeley.cs.jqf.fuzz.guidance.Result;
@@ -22,6 +18,7 @@ import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom;
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness;
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus;
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop;
+import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
@@ -32,8 +29,9 @@ import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
  * Since we only have one server at a time, everything is static. Yay.
  */
 public class Server {
-    private static LinkedHashMap<ExecutionIndex, Integer> eiMap = new LinkedHashMap<>();
-    private static Random rng = new Random();
+    /** Tracks the random value stored at an EI, as well as the last line of the stack trace */
+    private static LinkedHashMap<ExecutionIndex, EiData> eiMap = new LinkedHashMap<>();
+    private static final Random rng = new Random();
     private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance();
     private static final JavaScriptCodeGenerator jsGen = new JavaScriptCodeGenerator();
     private static String genContents;
@@ -44,12 +42,15 @@ public class Server {
         server.createContext("/ei", new ResponseHandler("ei") {
             @Override
             public String onGet() {
-                // For ease of parsing, we send the random byte first followed by a space; everything after the space
-                // is the stack trace of the EI
+                // For ease of parsing, we send the random byte followed by the last event string, followed by
+                // the execution index; each item separated by a colon.
                 StringBuilder sb = new StringBuilder();
-                for (Map.Entry<ExecutionIndex, Integer> entry : eiMap.entrySet()) {
-                    sb.append(entry.getValue());
-                    sb.append(" ");
+                for (Map.Entry<ExecutionIndex, EiData> entry : eiMap.entrySet()) {
+                    EiData value = entry.getValue();
+                    sb.append(value.choice);
+                    sb.append(":");
+                    sb.append(value.lastEvent);
+                    sb.append(":");
                     ExecutionIndex ei = entry.getKey();
                     sb.append(ei.toString());
                     sb.append("\n");
@@ -60,7 +61,7 @@ public class Server {
             @Override
             public String onPost(BufferedReader reader) throws IOException {
                 // POST expects parameters in a similar fashion, i.e. each line is int, space, EI array
-                LinkedHashMap<ExecutionIndex, Integer> newEiMap = new LinkedHashMap<>();
+                LinkedHashMap<ExecutionIndex, EiData> newEiMap = new LinkedHashMap<>();
                 for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                     String[] chunks = line.replace(",", "")
                             .replace("[", "")
@@ -71,7 +72,8 @@ public class Server {
                     for (int i = 1; i < chunks.length; i++) {
                         eiArr[i - 1] = Integer.parseInt(chunks[i].trim());
                     }
-                    newEiMap.put(new ExecutionIndex(eiArr), data);
+                    ExecutionIndex key = new ExecutionIndex(eiArr);
+                    newEiMap.put(key, new EiData(eiMap.get(key).lastEvent, data));
                     System.out.println(Arrays.toString(eiArr));
                 }
                 eiMap = newEiMap;
@@ -147,16 +149,17 @@ public class Server {
     private static class EiManualMutateGuidance implements Guidance {
         private Thread appThread = null; // Ensures only one thread
         private TraceEvent lastEvent = null;
-        private ExecutionIndexingState eiState = new ExecutionIndexingState();
+        private EiState eiState = new EiState();
         private boolean hasRun = false;
 
         public void reset() {
             hasRun = false;
+            // eiState is reset in getInput
         }
 
         @Override
         public InputStream getInput() throws IllegalStateException, GuidanceException {
-            eiState = new ExecutionIndexingState();
+            eiState = new EiState();
             return new InputStream() {
                 @Override
                 public int read() {
@@ -165,11 +168,12 @@ public class Server {
                     }
                     // Get the execution index of the last event
                     ExecutionIndex executionIndex = eiState.getExecutionIndex(lastEvent);
+//                    System.out.println("\tREAD " + eventToString(lastEvent));
                     // Attempt to get a value from the map, or else generate a random value
                     if (!eiMap.containsKey(executionIndex)) {
-                        eiMap.put(executionIndex, rng.nextInt(256));
+                        eiMap.put(executionIndex, new EiData(eventToString(lastEvent), rng.nextInt(256)));
                     }
-                    return eiMap.get(executionIndex);
+                    return eiMap.get(executionIndex).choice;
                 }
             };
         }
@@ -181,6 +185,7 @@ public class Server {
 
         @Override
         public void handleResult(Result result, Throwable throwable) throws GuidanceException {
+            System.out.println("\tHANDLE RESULT");
             hasRun = true;
         }
 
@@ -198,23 +203,63 @@ public class Server {
         }
 
         private boolean isTracking = false;
-
         private void handleEvent(TraceEvent e) {
+//            System.out.println("BEGIN VISIT");
             if (e instanceof CallEvent) {
-                if (((CallEvent) e).getInvokedMethodName().equals("dummy")) {
+//                if (((CallEvent) e).getContainingMethodName().equals("runGenerator")) {
+                if (((CallEvent) e).getInvokedMethodName().equals("Server#dummy()V")) {
                     isTracking = true;
                 }
-//                System.out.println("CALL: " + e.getContainingClass() + "#" + e.getContainingMethodName() + " --> " + ((CallEvent) e).getInvokedMethodName());
+                String trackedString = isTracking ? "*tracked" : "untracked";
+                System.out.println("CALL " + trackedString + ": " + e.getContainingClass() + "#"
+                        + e.getContainingMethodName() + " --> " + ((CallEvent) e).getInvokedMethodName());
+                if (isTracking) {
+                    e.applyVisitor(eiState);
+                }
             } else if (e instanceof ReturnEvent) {
-                if (e.getContainingMethodName().equals("dummy")) {
+                String evString = e.getContainingClass() + "#" + e.getContainingMethodName();
+//                if (evString.equals("Server#runGenerator")) {
+                if (evString.contains("dummy")) {
                     isTracking = false;
                 }
-//                System.out.println("RET: " + e.getContainingClass() + "#" + e.getContainingMethodName());
+                String trackedString = isTracking ? "*tracked" : "untracked";
+                System.out.println("RET " + trackedString + ": " + evString);
+                if (isTracking) {
+                    e.applyVisitor(eiState);
+                }
+            } else {
+                if (isTracking) {
+                    e.applyVisitor(eiState);
+                }
             }
             lastEvent = e;
-            if (isTracking) {
-                e.applyVisitor(eiState);
-            }
+//            System.out.println("END VISIT");
+        }
+    }
+
+    private static String eventToString(TraceEvent e) {
+        if (e instanceof BranchEvent) {
+            BranchEvent b = (BranchEvent) e;
+            return String.format("(branch) %s#%s()@%d [%d]", b.getContainingClass(), b.getContainingMethodName(),
+                    b.getLineNumber(), b.getArm());
+        } else if (e instanceof CallEvent) {
+            CallEvent c = (CallEvent) e;
+            return String.format("(call) %s#%s()@%d --> %s", c.getContainingClass(), c.getContainingMethodName(),
+                    c.getLineNumber(), c.getInvokedMethodName());
+
+        } else {
+            return String.format("(other) %s#%s()@%d", e.getContainingClass(), e.getContainingMethodName(),
+                    e.getLineNumber());
+        }
+    }
+
+    private static class EiData {
+        private final String lastEvent;
+        private final int choice;
+
+        public EiData(String lastEvent, int choice) {
+            this.lastEvent = lastEvent;
+            this.choice = choice;
         }
     }
 

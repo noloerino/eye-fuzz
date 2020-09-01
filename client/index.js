@@ -35,32 +35,32 @@ let getEi = function() {
             if (status === 0 || (status >= 200 && status < 400)) {
                 for (let line of req.responseText.split("\n")) {
                     if (line.length > 0) {
-                        let spaceIndex = line.indexOf(" ");
-                        let data = line.slice(0, spaceIndex);
-                        let ei = line.slice(spaceIndex + 1);
-                        eiTableData.push({ei: ei, data: data});
+                        let [data, event, ei] = line.split(":");
+                        eiTableData.push({ei: ei, data: data, event: event});
                     }
                 }
             } else {
-                eiTableData.push({ei: "ERROR " + status, data: 0});
+                eiTableData.push({ei: "ERROR " + status, data: 0, event: ""});
             }
             // Update DOM
             // https://stackoverflow.com/questions/7271490/delete-all-rows-in-an-html-table
             let newTBody = document.createElement("tbody");
             newTBody.id = "eiTableBody";
-            for (let {ei, data} of eiTableData) {
+            for (let {ei, data, event} of eiTableData) {
                 // console.log("new table data: " + ei + " " + data);
                 let newRow = newTBody.insertRow(-1);
                 let cell0 = newRow.insertCell(0);
                 cell0.innerText = ei;
                 cell0.className = "ei-cell";
                 let cell1 = newRow.insertCell(1);
+                cell1.innerText = event;
+                let cell2 = newRow.insertCell(2);
                 let dataInput = document.createElement("input");
                 dataInput.type = "number";
                 dataInput.min = "0";
                 dataInput.max = "255";
                 dataInput.value = data;
-                cell1.appendChild(dataInput);
+                cell2.appendChild(dataInput);
             }
             eiTableBody.parentNode.replaceChild(newTBody, eiTableBody);
             eiTableBody = newTBody;
