@@ -35,25 +35,27 @@ let getEi = function() {
             if (status === 0 || (status >= 200 && status < 400)) {
                 for (let line of req.responseText.split("\n")) {
                     if (line.length > 0) {
-                        let [data, event, ei] = line.split(":");
-                        eiTableData.push({ei: ei, data: data, event: event});
+                        let [data, stackTrace, ei] = line.split(":");
+                        let stackLines = stackTrace.split("||");
+                        let filteredStackTrace = stackLines.filter(l => l.indexOf("JavaScriptCodeGenerator") > 0);
+                        eiTableData.push({ei: ei, data: data, stackTrace: filteredStackTrace.join("\n")});
                     }
                 }
             } else {
-                eiTableData.push({ei: "ERROR " + status, data: 0, event: ""});
+                eiTableData.push({ei: "ERROR " + status, data: 0, stackTrace: ""});
             }
             // Update DOM
             // https://stackoverflow.com/questions/7271490/delete-all-rows-in-an-html-table
             let newTBody = document.createElement("tbody");
             newTBody.id = "eiTableBody";
-            for (let {ei, data, event} of eiTableData) {
+            for (let {ei, data, stackTrace} of eiTableData) {
                 // console.log("new table data: " + ei + " " + data);
                 let newRow = newTBody.insertRow(-1);
                 let cell0 = newRow.insertCell(0);
                 cell0.innerText = ei;
                 cell0.className = "ei-cell";
                 let cell1 = newRow.insertCell(1);
-                cell1.innerText = event;
+                cell1.innerText = stackTrace;
                 let cell2 = newRow.insertCell(2);
                 let dataInput = document.createElement("input");
                 dataInput.type = "number";
@@ -79,7 +81,7 @@ let postEi = function() {
         let row = rows[i];
         let ei = row.cells[0].innerText;
         // Read input cell
-        let data = row.cells[1].childNodes[0].value;
+        let data = row.cells[2].childNodes[0].value;
         body += data + " " + ei + "\n";
     }
     req.setRequestHeader("Content-Type", "text/plain");

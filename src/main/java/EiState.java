@@ -15,9 +15,9 @@ public class EiState implements TraceEventVisitor {
     private final int COUNTER_SIZE = 6151;
     private final int MAX_SUPPORTED_DEPTH = 1024; // Nothing deeper than this
 
-    private int depth = 0;
-    private ArrayList<Counter> stackOfCounters = new ArrayList<>();
-    private int[] rollingIndex = new int[2*MAX_SUPPORTED_DEPTH];
+    public int depth = 0;
+    private final ArrayList<Counter> stackOfCounters = new ArrayList<>();
+    public final int[] rollingIndex = new int[2*MAX_SUPPORTED_DEPTH];
 
     public EiState() {
         // Create a counter for depth = 0
@@ -53,7 +53,7 @@ public class EiState implements TraceEventVisitor {
             stackOfCounters.get(depth).clear();
         } catch (ArrayIndexOutOfBoundsException ex) {
             String evString = e.getContainingClass() + "#" + e.getContainingMethodName();
-            System.out.println("OOB FOR EVENT " + evString);
+            System.out.println("OOB FOR EVENT " + evString + "; DEPTH " + depth);
             throw ex;
         }
         // Decrement depth
@@ -82,14 +82,14 @@ public class EiState implements TraceEventVisitor {
     public void visitCallEvent(CallEvent c) {
         String evString = c.getContainingClass() + "#" + c.getContainingMethodName() + " --> "
                 + c.getInvokedMethodName();
-//        System.out.println("EI CALL: " + evString);
+        System.out.println("EI CALL @ DEPTH " + depth + ": " + evString);
         this.pushCall(c);
     }
 
     @Override
     public void visitReturnEvent(ReturnEvent r) {
         String evString = r.getContainingClass() + "#" + r.getContainingMethodName();
-//        System.out.println("EI RET: " + evString);
+        System.out.println("EI RET @ DEPTH " + depth + ": " + evString);
         this.popReturn(r);
     }
 }

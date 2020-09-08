@@ -7,20 +7,15 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.*;
-import java.util.function.Consumer;
 
 import com.sun.net.httpserver.HttpServer;
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex;
-import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
-import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException;
-import edu.berkeley.cs.jqf.fuzz.guidance.Result;
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom;
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness;
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus;
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop;
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent;
-import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
 
 /**
@@ -32,9 +27,11 @@ public class Server {
     /** Tracks the random value stored at an EI, as well as the last line of the stack trace */
     private static LinkedHashMap<ExecutionIndex, EiData> eiMap = new LinkedHashMap<>();
     private static final Random rng = new Random();
-    private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance();
+    private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance(eiMap, rng);
     private static final JavaScriptCodeGenerator jsGen = new JavaScriptCodeGenerator();
     private static String genContents;
+
+    public static final Map<Integer, String> eventStrings = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         init();
@@ -49,7 +46,7 @@ public class Server {
                     EiData value = entry.getValue();
                     sb.append(value.choice);
                     sb.append(":");
-                    sb.append(value.lastEvent);
+                    sb.append(value.stackTrace);
                     sb.append(":");
                     ExecutionIndex ei = entry.getKey();
                     sb.append(ei.toString());
@@ -73,10 +70,12 @@ public class Server {
                         eiArr[i - 1] = Integer.parseInt(chunks[i].trim());
                     }
                     ExecutionIndex key = new ExecutionIndex(eiArr);
-                    newEiMap.put(key, new EiData(eiMap.get(key).lastEvent, data));
-                    System.out.println(Arrays.toString(eiArr));
+                    newEiMap.put(key, new EiData(eiMap.get(key).stackTrace, data));
+//                    System.out.println(Arrays.toString(eiArr));
                 }
                 eiMap = newEiMap;
+                // who cares about abstraction barriers lmao
+                genGuidance.eiMap = eiMap;
                 return "OK";
             }
         });
@@ -90,7 +89,7 @@ public class Server {
                     @Override
                     public String onPost(BufferedReader reader) {
                         // Rerun the generator and return the contents
-                        runGenerator();
+                        dummy();
                         System.out.println("Updated generator contents (map is of size " + eiMap.size() + ")");
                         return getGenContents();
                     }
@@ -119,7 +118,12 @@ public class Server {
         System.out.println("Initial map is of size " + eiMap.size());
     }
 
+    /**
+     * Serves as an entry point to the tracking of the EI call stack.
+     * Returns should probably stop tracking at runGenerator to avoid an oob exception.
+     */
     private static void dummy() {
+        genGuidance.reset();
         runGenerator();
     }
 
@@ -129,11 +133,12 @@ public class Server {
 
     /**
      * Reruns the generator to update the generator string.
+     * NOT ACTUALLY THE ENTRY POINT - USE dummy INSTEAD
+     *
      * See Zest fuzzing loop.
      * https://github.com/rohanpadhye/JQF/blob/0152e82d4eb414b06438dec3ef0322135318291a/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java#L159
      */
     private static void runGenerator() {
-        genGuidance.reset();
         StreamBackedRandom randomFile = new StreamBackedRandom(genGuidance.getInput(), Long.BYTES);
         SourceOfRandomness random = new FastSourceOfRandomness(randomFile);
         GenerationStatus genStatus = new NonTrackingGenerationStatus(random);
@@ -141,125 +146,28 @@ public class Server {
         System.out.println("generator produced: " + getGenContents());
     }
 
-    /**
-     * Analogous to a ExecutionIndexGuidance, but is backed by the above eiMap.
-     * Needs to record coverage for EI to work.
-     * Run only once.
-     */
-    private static class EiManualMutateGuidance implements Guidance {
-        private Thread appThread = null; // Ensures only one thread
-        private TraceEvent lastEvent = null;
-        private EiState eiState = new EiState();
-        private boolean hasRun = false;
-
-        public void reset() {
-            hasRun = false;
-            // eiState is reset in getInput
-        }
-
-        @Override
-        public InputStream getInput() throws IllegalStateException, GuidanceException {
-            eiState = new EiState();
-            return new InputStream() {
-                @Override
-                public int read() {
-                    if (lastEvent == null) {
-                        throw new GuidanceException("Could not compute execution index; no instrumentation?");
-                    }
-                    // Get the execution index of the last event
-                    ExecutionIndex executionIndex = eiState.getExecutionIndex(lastEvent);
-//                    System.out.println("\tREAD " + eventToString(lastEvent));
-                    // Attempt to get a value from the map, or else generate a random value
-                    if (!eiMap.containsKey(executionIndex)) {
-                        eiMap.put(executionIndex, new EiData(eventToString(lastEvent), rng.nextInt(256)));
-                    }
-                    return eiMap.get(executionIndex).choice;
-                }
-            };
-        }
-
-        @Override
-        public boolean hasInput() {
-            return !hasRun;
-        }
-
-        @Override
-        public void handleResult(Result result, Throwable throwable) throws GuidanceException {
-            System.out.println("\tHANDLE RESULT");
-            hasRun = true;
-        }
-
-        @Override
-        public Consumer<TraceEvent> generateCallBack(Thread thread) {
-            if (appThread != null) {
-                throw new IllegalStateException("Guidance must run on main thread");
-            }
-            appThread = thread;
-            String entryPoint = SingleSnoop.entryPoints.get(thread);
-            if (entryPoint == null) {
-                throw new IllegalStateException("Guidance must be able to determine entry point");
-            }
-            return this::handleEvent;
-        }
-
-        private boolean isTracking = false;
-        private void handleEvent(TraceEvent e) {
-//            System.out.println("BEGIN VISIT");
-            if (e instanceof CallEvent) {
-//                if (((CallEvent) e).getContainingMethodName().equals("runGenerator")) {
-                if (((CallEvent) e).getInvokedMethodName().equals("Server#dummy()V")) {
-                    isTracking = true;
-                }
-                String trackedString = isTracking ? "*tracked" : "untracked";
-                System.out.println("CALL " + trackedString + ": " + e.getContainingClass() + "#"
-                        + e.getContainingMethodName() + " --> " + ((CallEvent) e).getInvokedMethodName());
-                if (isTracking) {
-                    e.applyVisitor(eiState);
-                }
-            } else if (e instanceof ReturnEvent) {
-                String evString = e.getContainingClass() + "#" + e.getContainingMethodName();
-//                if (evString.equals("Server#runGenerator")) {
-                if (evString.contains("dummy")) {
-                    isTracking = false;
-                }
-                String trackedString = isTracking ? "*tracked" : "untracked";
-                System.out.println("RET " + trackedString + ": " + evString);
-                if (isTracking) {
-                    e.applyVisitor(eiState);
-                }
-            } else {
-                if (isTracking) {
-                    e.applyVisitor(eiState);
-                }
-            }
-            lastEvent = e;
-//            System.out.println("END VISIT");
-        }
-    }
-
-    private static String eventToString(TraceEvent e) {
+    public static String eventToString(TraceEvent e) {
         if (e instanceof BranchEvent) {
             BranchEvent b = (BranchEvent) e;
-            return String.format("(branch) %s#%s()@%d [%d]", b.getContainingClass(), b.getContainingMethodName(),
-                    b.getLineNumber(), b.getArm());
+            return eventStrings.computeIfAbsent(
+                    b.getIid(),
+                    _k -> String.format("(branch) %s#%s()@%d [%d]", b.getContainingClass(), b.getContainingMethodName(),
+                            b.getLineNumber(), b.getArm())
+            );
         } else if (e instanceof CallEvent) {
             CallEvent c = (CallEvent) e;
-            return String.format("(call) %s#%s()@%d --> %s", c.getContainingClass(), c.getContainingMethodName(),
-                    c.getLineNumber(), c.getInvokedMethodName());
+            return eventStrings.computeIfAbsent(
+                    c.getIid(),
+                    _k -> String.format("(call) %s#%s()@%d --> %s", c.getContainingClass(), c.getContainingMethodName(),
+                                c.getLineNumber(), c.getInvokedMethodName())
+            );
 
         } else {
-            return String.format("(other) %s#%s()@%d", e.getContainingClass(), e.getContainingMethodName(),
-                    e.getLineNumber());
-        }
-    }
-
-    private static class EiData {
-        private final String lastEvent;
-        private final int choice;
-
-        public EiData(String lastEvent, int choice) {
-            this.lastEvent = lastEvent;
-            this.choice = choice;
+            return eventStrings.computeIfAbsent(
+                    e.getIid(),
+                    _k -> String.format("(other) %s#%s()@%d", e.getContainingClass(), e.getContainingMethodName(),
+                            e.getLineNumber())
+            );
         }
     }
 
@@ -274,7 +182,7 @@ public class Server {
         public final void handle(HttpExchange httpExchange) throws IOException {
             String method = httpExchange.getRequestMethod();
             Headers headers = httpExchange.getResponseHeaders();
-            System.out.println(method + " /" + name);
+//            System.out.println(method + " /" + name);
             headers.add("Access-Control-Allow-Origin", "*");
             headers.add("Access-Control-Allow-Methods","GET,POST,OPTIONS");
 //            headers.add("Access-Control-Allow-Headers","Access-Control-Allow-Origin,Content-Type");
