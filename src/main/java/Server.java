@@ -25,9 +25,8 @@ import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
  */
 public class Server {
     /** Tracks the random value stored at an EI, as well as the last line of the stack trace */
-    private static LinkedHashMap<ExecutionIndex, EiData> eiMap = new LinkedHashMap<>();
     private static final Random rng = new Random();
-    private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance(eiMap, rng);
+    private static final EiManualMutateGuidance genGuidance = new EiManualMutateGuidance(rng);
     private static final JavaScriptCodeGenerator jsGen = new JavaScriptCodeGenerator();
     private static String genContents;
 
@@ -42,7 +41,7 @@ public class Server {
                 // For ease of parsing, we send the random byte followed by the last event string, followed by
                 // the execution index; each item separated by a colon.
                 StringBuilder sb = new StringBuilder();
-                for (Map.Entry<ExecutionIndex, EiData> entry : eiMap.entrySet()) {
+                for (Map.Entry<ExecutionIndex, EiData> entry : genGuidance.eiMap.entrySet()) {
                     EiData value = entry.getValue();
                     sb.append(value.choice);
                     sb.append(":");
@@ -70,12 +69,10 @@ public class Server {
                         eiArr[i - 1] = Integer.parseInt(chunks[i].trim());
                     }
                     ExecutionIndex key = new ExecutionIndex(eiArr);
-                    newEiMap.put(key, new EiData(eiMap.get(key).stackTrace, data));
+                    newEiMap.put(key, new EiData(genGuidance.eiMap.get(key).stackTrace, data));
 //                    System.out.println(Arrays.toString(eiArr));
                 }
-                eiMap = newEiMap;
-                // who cares about abstraction barriers lmao
-                genGuidance.eiMap = eiMap;
+                genGuidance.eiMap = newEiMap;
                 return "OK";
             }
         });
@@ -90,7 +87,7 @@ public class Server {
                     public String onPost(BufferedReader reader) {
                         // Rerun the generator and return the contents
                         dummy();
-                        System.out.println("Updated generator contents (map is of size " + eiMap.size() + ")");
+                        System.out.println("Updated generator contents (map is of size " + genGuidance.eiMap.size() + ")");
                         return getGenContents();
                     }
                 });
@@ -115,7 +112,7 @@ public class Server {
         System.out.println(SingleSnoop.entryPoints);
         // Needed for some jank call tracking
         dummy();
-        System.out.println("Initial map is of size " + eiMap.size());
+        System.out.println("Initial map is of size " + genGuidance.eiMap.size());
     }
 
     /**

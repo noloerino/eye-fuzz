@@ -24,10 +24,10 @@ public class EiManualMutateGuidance implements Guidance {
     private TraceEvent lastEvent = null;
     private EiState eiState = new EiState();
 
-    public LinkedHashMap<ExecutionIndex, EiData> eiMap;
+    public LinkedHashMap<ExecutionIndex, EiData> eiMap = new LinkedHashMap<>();
     private final Random rng;
 
-    public EiManualMutateGuidance(LinkedHashMap<ExecutionIndex, EiData> eiMap, Random rng) {
+    public EiManualMutateGuidance(Random rng) {
         this.eiMap = eiMap;
         this.rng = rng;
     }
