@@ -78,6 +78,9 @@ public class Server {
         });
         server.createContext("/generator",
                 new ResponseHandler("generator") {
+
+                    boolean firstPost = true;
+
                     @Override
                     public String onGet() {
                         return getGenContents();
@@ -85,6 +88,15 @@ public class Server {
 
                     @Override
                     public String onPost(BufferedReader reader) {
+                        // Needed to enable profiling on the handler thread
+                        if (firstPost) {
+                            String target = Server.class.getName() + "#dummy";
+                            System.out.println("BEFORE SNOOP START: " + SingleSnoop.entryPoints);
+//                            SingleSnoop.startSnooping(target);
+                            SingleSnoop.entryPoints.put(Thread.currentThread(), target);
+                            System.out.println("AFTER SNOOP START: " + SingleSnoop.entryPoints);
+                            firstPost = false;
+                        }
                         // Rerun the generator and return the contents
                         dummy();
                         System.out.println("Updated generator contents (map is of size " + genGuidance.eiMap.size() + ")");

@@ -20,22 +20,43 @@
             <artifactId>closure-compiler</artifactId>
             <version>v20180204</version>
         </dependency>
+
+        <!-- Some random dependencies of JQF -->
+        <dependency>
+            <groupId>org.jgrapht</groupId>
+            <artifactId>jgrapht-core</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jacoco</groupId>
+            <artifactId>org.jacoco.report</artifactId>
+            <version>0.8.2</version>
+        </dependency>
+        <!-- End random dependencies -->
+
         <!-- JQF: test dependency for @Fuzz annotation -->
         <dependency>
             <groupId>edu.berkeley.cs.jqf</groupId>
             <artifactId>jqf-fuzz</artifactId>
-            <version>1.5</version>
+<!--            <scope>system</scope>-->
+<!--            <systemPath>${project.basedir}/../JQF/fuzz/target/jqf-fuzz-1.6-SNAPSHOT.jar</systemPath>-->
+            <version>1.6</version>
         </dependency>
         <dependency>
             <groupId>edu.berkeley.cs.jqf</groupId>
             <artifactId>jqf-examples</artifactId>
-            <version>1.5</version>
+<!--            <scope>system</scope>-->
+<!--            <systemPath>${project.basedir}/../JQF/examples/target/jqf-examples-1.6-SNAPSHOT.jar</systemPath>-->
+            <version>1.6</version>
         </dependency>
         <dependency>
             <groupId>edu.berkeley.cs.jqf</groupId>
             <artifactId>jqf-instrument</artifactId>
-            <version>1.5</version>
+<!--            <scope>system</scope>-->
+<!--            <systemPath>${project.basedir}/../JQF/instrument/target/jqf-instrument-1.6-SNAPSHOT.jar</systemPath>-->
+            <version>1.6</version>
         </dependency>
+
         <dependency>
             <groupId>com.pholser</groupId>
             <artifactId>junit-quickcheck-generators</artifactId>
@@ -64,7 +85,4 @@
             </plugin>
         </plugins>
     </build>
-
-
-
 </project>
