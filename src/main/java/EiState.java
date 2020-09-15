@@ -82,14 +82,14 @@ public class EiState implements TraceEventVisitor {
     public void visitCallEvent(CallEvent c) {
         String evString = c.getContainingClass() + "#" + c.getContainingMethodName() + " --> "
                 + c.getInvokedMethodName();
-        System.out.println("EI CALL @ DEPTH " + depth + ": " + evString);
+//        System.out.println("EI CALL @ DEPTH " + depth + ": " + evString);
         this.pushCall(c);
     }
 
     @Override
     public void visitReturnEvent(ReturnEvent r) {
         String evString = r.getContainingClass() + "#" + r.getContainingMethodName();
-        System.out.println("EI RET @ DEPTH " + depth + ": " + evString);
+//        System.out.println("EI RET @ DEPTH " + depth + ": " + evString);
         this.popReturn(r);
     }
 }

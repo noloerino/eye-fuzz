@@ -23,17 +23,18 @@ public class EiManualMutateGuidance implements Guidance {
     private Thread appThread = null; // Ensures only one thread
     private TraceEvent lastEvent = null;
     private EiState eiState = new EiState();
+    private boolean hasRun = false;
 
     public LinkedHashMap<ExecutionIndex, EiData> eiMap = new LinkedHashMap<>();
     private final Random rng;
 
     public EiManualMutateGuidance(Random rng) {
-        this.eiMap = eiMap;
         this.rng = rng;
     }
 
     public void reset() {
         eiState = new EiState();
+        hasRun = false;
     }
 
     /**
@@ -61,7 +62,7 @@ public class EiManualMutateGuidance implements Guidance {
                 }
                 // Get the execution index of the last event
                 ExecutionIndex executionIndex = eiState.getExecutionIndex(lastEvent);
-                System.out.println("\tREAD " + Server.eventToString(lastEvent));
+                log("\tREAD " + Server.eventToString(lastEvent));
                 // Attempt to get a value from the map, or else generate a random value
                 return eiMap.computeIfAbsent(
                         executionIndex,
@@ -73,12 +74,13 @@ public class EiManualMutateGuidance implements Guidance {
 
     @Override
     public boolean hasInput() {
-        return true;
+        return !hasRun;
     }
 
     @Override
     public void handleResult(Result result, Throwable throwable) throws GuidanceException {
-        System.out.println("\tHANDLE RESULT");
+//        System.out.println("\tHANDLE RESULT");
+        hasRun = true;
     }
 
     @Override
@@ -94,6 +96,13 @@ public class EiManualMutateGuidance implements Guidance {
         return this::handleEvent;
     }
 
+    private static final boolean verbose = false;
+    private void log(String msg) {
+        if (verbose) {
+            System.out.println(msg);
+        }
+    }
+
     private boolean isTracking = false;
     private void handleEvent(TraceEvent e) {
         // Needed to cache stack traces
@@ -105,7 +114,7 @@ public class EiManualMutateGuidance implements Guidance {
                 isTracking = true;
             }
             String trackedString = isTracking ? "*tracked" : "untracked";
-            System.out.println("CALL " + trackedString + ": " + contents);
+            log("CALL " + trackedString + ": " + contents);
         } else if (e instanceof ReturnEvent) {
             String evString = e.getContainingClass() + "#" + e.getContainingMethodName();
 //                if (evString.equals("com/pholser/junit/quickcheck/internal/GeometricDistribution#<init>")) {
@@ -114,10 +123,10 @@ public class EiManualMutateGuidance implements Guidance {
                 isTracking = false;
             }
             String trackedString = isTracking ? "*tracked" : "untracked";
-            System.out.println("RET " + trackedString + ": " + evString);
+            log("RET " + trackedString + ": " + evString);
         } else {
             String trackedString = isTracking ? "*tracked" : "untracked";
-            System.out.println("OTHER " + trackedString + ": " + contents);
+            log("OTHER " + trackedString + ": " + contents);
         }
         if (isTracking) {
             e.applyVisitor(eiState);

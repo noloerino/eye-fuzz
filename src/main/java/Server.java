@@ -32,7 +32,7 @@ public class Server {
 
     public static final Map<Integer, String> eventStrings = new HashMap<>();
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         init();
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 8000), 0);
         server.createContext("/ei", new ResponseHandler("ei") {
@@ -76,33 +76,6 @@ public class Server {
                 return "OK";
             }
         });
-        server.createContext("/generator",
-                new ResponseHandler("generator") {
-
-                    boolean firstPost = true;
-
-                    @Override
-                    public String onGet() {
-                        return getGenContents();
-                    }
-
-                    @Override
-                    public String onPost(BufferedReader reader) {
-                        // Needed to enable profiling on the handler thread
-                        if (firstPost) {
-                            String target = Server.class.getName() + "#dummy";
-                            System.out.println("BEFORE SNOOP START: " + SingleSnoop.entryPoints);
-//                            SingleSnoop.startSnooping(target);
-                            SingleSnoop.entryPoints.put(Thread.currentThread(), target);
-                            System.out.println("AFTER SNOOP START: " + SingleSnoop.entryPoints);
-                            firstPost = false;
-                        }
-                        // Rerun the generator and return the contents
-                        dummy();
-                        System.out.println("Updated generator contents (map is of size " + genGuidance.eiMap.size() + ")");
-                        return getGenContents();
-                    }
-                });
         server.createContext("/coverage",
                 new ResponseHandler("coverage") {
                     @Override
@@ -111,8 +84,22 @@ public class Server {
                     }
                 }
         );
+        GenHandler genHandler = new GenHandler("generator");
+        server.createContext("/generator", genHandler);
+
         server.start();
         System.out.println("Server initialized at port " + server.getAddress().getPort());
+        //noinspection InfiniteLoopStatement
+        while (true) {
+            synchronized (genHandler) {
+                while (!genHandler.newEiUpdate) {
+                    genHandler.wait();
+                }
+                dummy();
+                genHandler.newEiUpdate = false;
+                genHandler.notifyAll();
+            }
+        }
     }
 
     private static void init() {
@@ -177,6 +164,41 @@ public class Server {
                     _k -> String.format("(other) %s#%s()@%d", e.getContainingClass(), e.getContainingMethodName(),
                             e.getLineNumber())
             );
+        }
+    }
+
+    private static class GenHandler extends ResponseHandler {
+        public boolean newEiUpdate = false;
+
+        public GenHandler(String name) {
+            super(name);
+        }
+
+        @Override
+        public String onGet() {
+            return getGenContents();
+        }
+
+        @Override
+        public String onPost(BufferedReader reader) {
+            // Need to yield back to main thread, which is running a loop with a monitor
+            // that just runs the generator when notified
+            synchronized (this) {
+                newEiUpdate = true;
+                this.notifyAll();
+            }
+            synchronized (this) {
+                while (newEiUpdate) {
+                    try {
+                        this.wait();
+                    } catch (InterruptedException e) {
+                        System.out.println(e);
+                        return "INTERRUPTED ERROR";
+                    }
+                }
+            }
+            System.out.println("Updated generator contents (map is of size " + genGuidance.eiMap.size() + ")");
+            return getGenContents();
         }
     }
 

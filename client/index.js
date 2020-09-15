@@ -38,8 +38,8 @@ let getEi = function() {
                         let [data, stackTrace, ei] = line.split(":");
                         let stackLines = stackTrace.split("||");
                         let filteredStackTrace =
-                            stackLines;
-                            // stackLines.filter(l => l.indexOf("JavaScriptCodeGenerator") > 0);
+                            // stackLines;
+                            stackLines.filter(l => l.indexOf("JavaScriptCodeGenerator") > 0);
                         eiTableData.push({ei: ei, data: data, stackTrace: filteredStackTrace.join("\n")});
                     }
                 }
