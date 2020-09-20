@@ -11,6 +11,10 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
@@ -42,37 +46,19 @@ object Server {
         val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
         server.createContext("/ei", object : ResponseHandler("ei") {
             override fun onGet(): String {
-                // For ease of parsing, we send the random byte followed by the last event string, followed by
-                // the execution index; each item separated by a colon.
-                val sb = StringBuilder()
-                for ((ei, value) in genGuidance.eiMap) {
-                    sb.append(value.choice)
-                    sb.append(":")
-                    sb.append(value.stackTrace)
-                    sb.append(":")
-                    sb.append(ei.toString())
-                    sb.append("\n")
-                }
-                return sb.toString()
+                val data = genGuidance.eiMap.map { (ei, value) -> EiWithData(ei, value.stackTrace, value.choice) }
+                return Json.encodeToString(data)
             }
 
             override fun onPost(reader: BufferedReader): String {
                 // POST expects parameters in a similar fashion, i.e. each line is int, space, EI array
                 val newEiMap = LinkedHashMap<ExecutionIndex, EiData>()
-                var line = reader.readLine()
-                while (line != null) {
-                    val chunks = line.replace(",", "")
-                            .replace("[", "")
-                            .replace("]", "")
-                            .split(" ").toTypedArray()
-                    val data = chunks[0].toInt()
-                    val eiArr = IntArray(chunks.size - 1)
-                    for (i in 1 until chunks.size) {
-                        eiArr[i - 1] = chunks[i].trim { it <= ' ' }.toInt()
-                    }
-                    val key = ExecutionIndex(eiArr)
-                    newEiMap[key] = EiData(genGuidance.eiMap[key]!!.stackTrace, data)
-                    line = reader.readLine()
+                val text = reader.readText()
+                val arr = Json.decodeFromString<List<EiWithoutStackTrace>>(text)
+                for (e in arr) {
+                    val key = e.ei
+                    val choice = e.choice
+                    newEiMap[key] = EiData(genGuidance.eiMap[key]!!.stackTrace, choice)
                 }
                 genGuidance.eiMap = newEiMap
                 return "OK"

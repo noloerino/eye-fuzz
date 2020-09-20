@@ -33,15 +33,21 @@ let getEi = function() {
             let status = req.status;
             let eiTableData = [];
             if (status === 0 || (status >= 200 && status < 400)) {
-                for (let line of req.responseText.split("\n")) {
-                    if (line.length > 0) {
-                        let [data, stackTrace, ei] = line.split(":");
-                        let stackLines = stackTrace.split("||");
-                        let filteredStackTrace =
-                            // stackLines;
-                            stackLines.filter(l => l.indexOf("JavaScriptCodeGenerator") > 0);
-                        eiTableData.push({ei: ei, data: data, stackTrace: filteredStackTrace.join("\n")});
+                let arr = JSON.parse(req.responseText)
+                for (let {ei, stackTrace, choice} of arr) {
+                    let stackLines = stackTrace.split("||");
+                    let filteredStackTrace =
+                        // stackLines;
+                        stackLines.filter(l => l.indexOf("JavaScriptCodeGenerator") > 0);
+                    let eiString = "";
+                    for (let i = 0; i < ei.length; i += 2) {
+                        eiString += ei[i] + " (" + ei[i + 1] + ")\n"
                     }
+                    eiTableData.push({
+                        ei: eiString,
+                        data: choice,
+                        stackTrace: filteredStackTrace.join("\n")
+                    });
                 }
             } else {
                 eiTableData.push({ei: "ERROR " + status, data: 0, stackTrace: ""});
@@ -76,16 +82,28 @@ let getEi = function() {
 let postEi = function() {
     let req = new XMLHttpRequest();
     req.open("POST", SERVER_URL + "/ei");
-    let body = "";
+    let arr = [];
     // Read from DOM since underlying state may be outdated
     let rows = eiTableBody.rows;
     for (let i = 0; i < rows.length; i++) {
         let row = rows[i];
-        let ei = row.cells[0].innerText;
+        let ei = "[" + (
+            row.cells[0].innerText
+                .replaceAll("(", "")
+                .replaceAll(")", "")
+                .replaceAll("\n", " ")
+                .trim()
+                .replaceAll(" ", ",")
+            ) + "]";
+        console.log(ei)
         // Read input cell
-        let data = row.cells[2].childNodes[0].value;
-        body += data + " " + ei + "\n";
+        let choice = row.cells[2].childNodes[0].value;
+        arr.push({
+            ei: JSON.parse(ei),
+            choice: parseInt(choice),
+        });
     }
+    let body = JSON.stringify(arr);
     req.setRequestHeader("Content-Type", "text/plain");
     req.onreadystatechange = () => {
         if (req.readyState === XMLHttpRequest.DONE) {
