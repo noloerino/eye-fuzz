@@ -1,0 +1,1 @@
+data class EiData(val stackTrace: String, val choice: Int)

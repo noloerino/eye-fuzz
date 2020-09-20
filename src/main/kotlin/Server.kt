@@ -12,7 +12,6 @@ import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
 import java.io.BufferedReader
-import java.io.IOException
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.util.*
@@ -107,7 +106,7 @@ object Server {
 
     private fun init() {
         System.setProperty("jqf.traceGenerators", "true")
-        SingleSnoop.setCallbackGenerator { thread: Thread? -> genGuidance.generateCallBack(thread) }
+        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
         //        String target = JavaScriptCodeGenerator.class.getName() + "#generate";
         val target = Server::class.java.name + "#dummy"
         SingleSnoop.startSnooping(target)
@@ -127,7 +126,7 @@ object Server {
     }
 
     private fun getGenContents(): String {
-        return genContents!!.substring(0, Math.min(genContents!!.length, 1024))
+        return genContents!!.substring(0, genContents!!.length.coerceAtMost(1024))
     }
 
     /**
@@ -147,28 +146,23 @@ object Server {
 
     @JvmStatic
     fun eventToString(e: TraceEvent): String {
-        return if (e is BranchEvent) {
-            val b = e
-            eventStrings.computeIfAbsent(
-                    b.iid
-            ) { _k: Int? ->
-                String.format("(branch) %s#%s()@%d [%d]", b.containingClass, b.containingMethodName,
-                        b.lineNumber, b.arm)
+        return when (e) {
+            is BranchEvent -> {
+                eventStrings.computeIfAbsent(e.iid) {
+                    String.format("(branch) %s#%s()@%d [%d]", e.containingClass, e.containingMethodName,
+                            e.lineNumber, e.arm)
+                }
             }
-        } else if (e is CallEvent) {
-            val c = e
-            eventStrings.computeIfAbsent(
-                    c.iid
-            ) { _k: Int? ->
-                String.format("(call) %s#%s()@%d --> %s", c.containingClass, c.containingMethodName,
-                        c.lineNumber, c.invokedMethodName)
+            is CallEvent -> {
+                eventStrings.computeIfAbsent(e.iid) {
+                    String.format("(call) %s#%s()@%d --> %s", e.containingClass, e.containingMethodName,
+                            e.lineNumber, e.invokedMethodName)
+                }
             }
-        } else {
-            eventStrings.computeIfAbsent(
-                    e.iid
-            ) { _k: Int? ->
-                String.format("(other) %s#%s()@%d", e.containingClass, e.containingMethodName,
-                        e.lineNumber)
+            else -> {
+                eventStrings.computeIfAbsent(e.iid) {
+                    String.format("(other) %s#%s()@%d", e.containingClass, e.containingMethodName, e.lineNumber)
+                }
             }
         }
     }
@@ -214,7 +208,7 @@ object Server {
             when (method) {
                 "GET" -> {
                     response = onGet()
-                    if (response.length == 0) {
+                    if (response.isEmpty()) {
                         httpExchange.sendResponseHeaders(204, -1)
                     } else {
                         httpExchange.sendResponseHeaders(200, response.length.toLong())
@@ -222,7 +216,7 @@ object Server {
                 }
                 "POST" -> {
                     BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPost(reader) }
-                    if (response.length == 0) {
+                    if (response.isEmpty()) {
                         httpExchange.sendResponseHeaders(204, -1)
                     } else {
                         httpExchange.sendResponseHeaders(200, response.length.toLong())
