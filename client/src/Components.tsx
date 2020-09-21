@@ -28,7 +28,11 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <tbody id="eiTableBody">
                     {vnode.attrs.eiTableData.map(({ei, stackTrace, choice}, i) => (
                         <tr>
-                            <td className="eiCell">
+                            <td className="eiCell" style={{
+                                maxWidth: "20em",
+                                overflow: "scroll",
+                                textOverflow: "clip",
+                            }}>
                                 {ei}
                             </td>
                             <td>
@@ -70,7 +74,16 @@ class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
                 </thead>
                 <tbody id="generatorTableBody">
                 <tr>
-                    <td id="genContentCell">{vnode.attrs.genOutput}</td>
+                    <td id="genContentCell" style={{
+                        maxHeight: "20em",
+                        maxWidth: "30em",
+                        overflow: "scroll",
+                        whiteSpace: "nowrap",
+                        fontSize: 14,
+                        fontFamily: '"PT Mono", "Courier"'
+                    }}>
+                        {vnode.attrs.genOutput}
+                    </td>
                 </tr>
                 </tbody>
             </table>
