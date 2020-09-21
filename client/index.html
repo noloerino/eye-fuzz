@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>eye-fuzz</title>
-    <script src="index.js"></script>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
     <style>
         th, td {
             border: 0.01em solid;
@@ -31,59 +29,7 @@
     </style>
 </head>
 <body>
-    <div id="root">
-        <table>
-            <tbody>
-            <tr>
-                <!-- EI -->
-                <td>
-                    <form id="rerunGenForm" method="POST" action="http://localhost:8000/generator">
-                        <button type="submit">Rerun generator</button>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th scope="col">ExecutionIndex</th>
-                                    <th scope="col">Last Event</th>
-                                    <th scope="col">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody id="eiTableBody">
-                            </tbody>
-                        </table>
-                    </form>
-                </td>
-                <!-- Generator -->
-                <td>
-                    <table>
-                        <thead>
-                            <tr>
-                                <!-- TODO show fields instead? -->
-                                <th scope="col">Generator Serialized Output</th>
-                            </tr>
-                        </thead>
-                        <tbody id="generatorTableBody">
-                        <tr>
-                            <td id="genContentCell"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </td>
-                <!-- Coverage -->
-                <td>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th scope="col">Coverage</th>
-                            </tr>
-                        </thead>
-                        <!-- Ideally it should be more enum-like -->
-                        <tbody id="coverageTableBody">
-                        </tbody>
-                    </table>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <script src="bin/app.js"></script>
 </body>
 </html>

@@ -11,7 +11,6 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -186,10 +185,10 @@ object Server {
         override fun handle(httpExchange: HttpExchange) {
             val method = httpExchange.requestMethod
             val headers = httpExchange.responseHeaders
-            //            System.out.println(method + " /" + name);
+//            println("$method /$name");
             headers.add("Access-Control-Allow-Origin", "*")
             headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-            //            headers.add("Access-Control-Allow-Headers","Access-Control-Allow-Origin,Content-Type");
+            headers.add("Access-Control-Allow-Headers", "Access-Control-Allow-Origin,Content-Type");
             var response = ""
             when (method) {
                 "GET" -> {
