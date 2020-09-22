@@ -10,7 +10,6 @@ import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
 import java.io.InputStream
 import java.util.*
 import java.util.function.Consumer
-import java.util.stream.Collectors
 
 /**
  * Analogous to a ExecutionIndexGuidance, but is backed by the above eiMap.
@@ -39,16 +38,11 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      * the full stack trace of the current EI state
      * should be invoked after getExecutionIndex was called on lastEvent
      */
-    private val fullStackTrace: String
-        get() {
-            val lines = arrayOfNulls<String>(eiState.depth + 1)
-            // Manual copy because we don't care about counts
-            for (i in 0 until eiState.depth + 1) {
-                val iid = eiState.rollingIndex[2 * i]
-                val count = eiState.rollingIndex[2 * i + 1]
-                lines[i] = "count " + count + " " + Server.eventStrings[iid]
-            }
-            return Arrays.stream(lines).collect(Collectors.joining(" || "))
+    private val fullStackTrace: List<StackTraceLine>
+        get() = (0 until eiState.depth + 1).map { i ->
+            val iid = eiState.rollingIndex[2 * i]
+            val count = eiState.rollingIndex[2 * i + 1]
+            StackTraceLine(Server.callLocations[iid]!!, count)
         }
 
     override fun getInput(): InputStream {

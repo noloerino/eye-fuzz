@@ -9,10 +9,26 @@ interface ExecutionIndexDisplayAttrs {
     showUnused: boolean;
 }
 
+interface StackTraceLine {
+    callLocation: {
+        iid: number;
+        containingClass: string;
+        containingMethodName: string;
+        lineNumber: number;
+        invokedMethodName: string;
+    };
+    count: number;
+}
+
+function serializeStackTraceLine(l: StackTraceLine): string {
+    let cl = l.callLocation;
+    return `(${l.count}) ${cl.containingClass}#${cl.containingMethodName}()@${cl.lineNumber} --> ${cl.invokedMethodName}`;
+}
+
 interface EiWithData {
     ei: string;
     choice: number;
-    stackTrace: string;
+    stackTrace: StackTraceLine[];
     used: boolean;
 }
 
@@ -44,8 +60,8 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 <td>
                                     <input type="checkbox" disabled={true} checked={used} />
                                 </td>
-                                <td>
-                                    {stackTrace}
+                                <td style={{whiteSpace: "pre-wrap"}}>
+                                    {stackTrace.map(serializeStackTraceLine).join("\n")}
                                 </td>
                                 <td>
                                     <span>{choice}</span>
@@ -125,10 +141,13 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             .then((arr: EiWithData[]) => {
                 this.eiTableData = [];
                 for (let {ei, stackTrace, choice, used} of arr) {
-                    let stackLines = stackTrace.split("||");
-                    let filteredStackTrace: string[] =
-                        // stackLines;
-                        stackLines.filter((l: string) => l.indexOf("JavaScriptCodeGenerator") > 0);
+                    const targetClass = "JavaScriptCodeGenerator";
+                    let filteredStackTrace: StackTraceLine[] =
+                        // stackTrace;
+                        stackTrace.filter((l: StackTraceLine) =>
+                            (l.callLocation.containingClass.indexOf(targetClass) >= 0)
+                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                        );
                     let eiString = "";
                     for (let i = 0; i < ei.length; i += 2) {
                         eiString += ei[i] + " (" + ei[i + 1] + ")\n"
@@ -136,13 +155,13 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     this.eiTableData.push({
                         ei: eiString,
                         choice,
-                        stackTrace: filteredStackTrace.join("\n"),
+                        stackTrace: filteredStackTrace,
                         used,
                     });
                 }
             })
             .catch(e => {
-                this.eiTableData = [{ei: "ERROR " + e.message, choice: 0, stackTrace: "", used: false}]
+                this.eiTableData = [{ei: "ERROR " + e.message, choice: 0, stackTrace: [], used: false}]
             });
     }
 

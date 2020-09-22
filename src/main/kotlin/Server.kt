@@ -32,8 +32,10 @@ object Server {
     private val jsGen = JavaScriptCodeGenerator()
     private var genContents: String? = null
 
+    val eventStrings: MutableMap<Int, String> = mutableMapOf()
+
     @JvmField
-    val eventStrings: MutableMap<Int, String> = HashMap()
+    val callLocations: MutableMap<Int, CallLocation> = mutableMapOf()
 
     private val lock = ReentrantLock()
     private val hasEiUpdate = lock.newCondition()
@@ -159,6 +161,9 @@ object Server {
                 }
             }
             is CallEvent -> {
+                callLocations.computeIfAbsent(e.iid) {
+                    CallLocation(e.iid, e.containingClass, e.containingMethodName, e.lineNumber, e.invokedMethodName)
+                }
                 eventStrings.computeIfAbsent(e.iid) {
                     String.format("(call) %s#%s()@%d --> %s", e.containingClass, e.containingMethodName,
                             e.lineNumber, e.invokedMethodName)
@@ -209,11 +214,11 @@ object Server {
             val method = httpExchange.requestMethod
             val headers = httpExchange.responseHeaders
             if (verbose) {
-                println("$method /$name");
+                println("$method /$name")
             }
             headers.add("Access-Control-Allow-Origin", "*")
             headers.add("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS")
-            headers.add("Access-Control-Allow-Headers", "Access-Control-Allow-Origin,Content-Type");
+            headers.add("Access-Control-Allow-Headers", "Access-Control-Allow-Origin,Content-Type")
             var response = ""
             fun endResponse() {
                 if (response.isEmpty()) {

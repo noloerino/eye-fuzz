@@ -6,10 +6,10 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-data class EiData(val stackTrace: String, var choice: Int)
+data class EiData(val stackTrace: StackTrace, var choice: Int)
 
 /**
- * Represents an execution index without a stack trace, which is what is given back from POST requests.
+ * Represents an execution index without a stack trace, which is what is given back from POST/PATCH requests.
  */
 @Serializable
 data class EiWithoutStackTrace(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
@@ -20,9 +20,22 @@ data class EiWithoutStackTrace(val ei: @Serializable(with = ExecutionIndexSerial
  */
 @Serializable
 data class EiWithData(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
-                      val stackTrace: String,
+                      val stackTrace: StackTrace,
                       val choice: Int,
                       val used: Boolean)
+
+
+typealias StackTrace = List<StackTraceLine>
+
+/**
+ * Represents a single line within a stack trace.
+ */
+@Serializable
+data class StackTraceLine(val callLocation: CallLocation, val count: Int)
+
+@Serializable
+data class CallLocation(val iid: Int, val containingClass: String, val containingMethodName: String,
+                        val lineNumber: Int, val invokedMethodName: String)
 
 object ExecutionIndexSerializer : KSerializer<ExecutionIndex> {
     override val descriptor = ListSerializer(Int.serializer()).descriptor
