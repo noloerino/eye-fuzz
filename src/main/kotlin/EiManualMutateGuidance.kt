@@ -22,15 +22,21 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     private var lastEvent: TraceEvent? = null
     private var eiState = EiState()
     private var hasRun = false
+
+    /**
+     * Tracks which EIs were used in the most recent run of the generator
+     */
+    val usedThisRun = mutableSetOf<ExecutionIndex>()
     var eiMap = LinkedHashMap<ExecutionIndex, EiData>()
 
     fun reset() {
         eiState = EiState()
         hasRun = false
+        usedThisRun.clear()
     }
 
     /**
-     * @return the full stack trace of the current EI state
+     * the full stack trace of the current EI state
      * should be invoked after getExecutionIndex was called on lastEvent
      */
     private val fullStackTrace: String
@@ -54,6 +60,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
                 // Get the execution index of the last event
                 val executionIndex = eiState.getExecutionIndex(lastEvent!!)
                 log("\tREAD " + eventToString(lastEvent!!))
+                usedThisRun.add(executionIndex)
                 // Attempt to get a value from the map, or else generate a random value
                 return eiMap.computeIfAbsent(executionIndex) { EiData(fullStackTrace, rng.nextInt(256)) }.choice
             }

@@ -4,13 +4,16 @@ import { MithrilTsxComponent } from 'mithril-tsx-component';
 const SERVER_URL = "http://localhost:8000";
 
 interface ExecutionIndexDisplayAttrs {
-    eiTableData: EiWithData[]
+    eiTableData: EiWithData[];
+    newEiChoices: Map<number, number>;
+    showUnused: boolean;
 }
 
 interface EiWithData {
     ei: string;
     choice: number;
     stackTrace: string;
+    used: boolean;
 }
 
 class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAttrs> {
@@ -21,35 +24,47 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <thead>
                     <tr>
                         <th scope="col">ExecutionIndex</th>
-                        <th scope="col">Last Event</th>
-                        <th scope="col">Value</th>
+                        <th scope="col">Used</th>
+                        <th scope="col">Stack Trace</th>
+                        <th scope="col">Old Value</th>
+                        <th scope="col">New Value</th>
                     </tr>
                     </thead>
                     <tbody id="eiTableBody">
-                    {vnode.attrs.eiTableData.map(({ei, stackTrace, choice}, i) => (
-                        <tr>
-                            <td className="eiCell" style={{
-                                maxWidth: "20em",
-                                overflow: "scroll",
-                                textOverflow: "clip",
-                            }}>
-                                {ei}
-                            </td>
-                            <td>
-                                {stackTrace}
-                            </td>
-                            <td>
-                                <input type="number" min={0} max={255} value={choice} data-index={i}
-                                    oninput={(e: InputEvent) => {
-                                        // @ts-ignore
-                                        let v = parseInt(e.target.value);
-                                        // Handle NaN on POST side to let the field be empty
-                                        // TODO ceiling/floor this
-                                        vnode.attrs.eiTableData[i].choice = v;
-                                    }}
-                                />
-                            </td>
-                        </tr>
+                    {vnode.attrs.eiTableData.flatMap(({ei, stackTrace, choice, used}, i) => (
+                        (vnode.attrs.showUnused || used) ? [(
+                            <tr>
+                                <td className="eiCell" style={{
+                                    maxWidth: "20em",
+                                    overflow: "scroll",
+                                    textOverflow: "clip",
+                                }}>
+                                    {ei}
+                                </td>
+                                <td>
+                                    <input type="checkbox" disabled={true} checked={used} />
+                                </td>
+                                <td>
+                                    {stackTrace}
+                                </td>
+                                <td>
+                                    <span>{choice}</span>
+                                </td>
+                                <td>
+                                    <input type="number" min={0} max={255} value={vnode.attrs.newEiChoices.get(i) ?? ""}
+                                        oninput={(e: InputEvent) => {
+                                            let value = (e.target as HTMLInputElement)?.value ?? "";
+                                            if (value === "") {
+                                                vnode.attrs.newEiChoices.delete(i);
+                                            } else {
+                                                // TODO ceiling/floor this
+                                                vnode.attrs.newEiChoices.set(i, parseInt(value));
+                                            }
+                                        }}
+                                    />
+                                </td>
+                            </tr>
+                        )] : []
                     ))}
                     </tbody>
                 </table>
@@ -92,8 +107,10 @@ class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
 }
 
 export class RootTable extends MithrilTsxComponent<{ }> {
-    eiTableData: EiWithData[] = []
+    eiTableData: EiWithData[] = [];
+    newEiChoices: Map<number, number> = new Map();
     genOutput: string = "";
+    showUnused: boolean = true;
 
     oninit() {
         this.getGenOutput();
@@ -107,7 +124,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         })
             .then((arr: EiWithData[]) => {
                 this.eiTableData = [];
-                for (let {ei, stackTrace, choice} of arr) {
+                for (let {ei, stackTrace, choice, used} of arr) {
                     let stackLines = stackTrace.split("||");
                     let filteredStackTrace: string[] =
                         // stackLines;
@@ -118,30 +135,32 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     }
                     this.eiTableData.push({
                         ei: eiString,
-                        choice: choice,
-                        stackTrace: filteredStackTrace.join("\n")
+                        choice,
+                        stackTrace: filteredStackTrace.join("\n"),
+                        used,
                     });
                 }
             })
             .catch(e => {
-                this.eiTableData = [{ei: "ERROR " + e.message, choice: 0, stackTrace: ""}]
+                this.eiTableData = [{ei: "ERROR " + e.message, choice: 0, stackTrace: "", used: false}]
             });
     }
 
     // Returns a promise to allow us to await on the result on this request
-    postEi(): Promise<void> {
-        let arr = this.eiTableData.map(({ei, choice}) => ({
+    updateEi(): Promise<void> {
+        let arr = Array.from(this.newEiChoices.entries()).map(([i, choice]) => ({
             ei: JSON.parse(
                 "[" + (
-                    ei.replace(/[\(\)]/g, "")
+                    this.eiTableData[i].ei.replace(/[()]/g, "")
                         .replace(/\n/g, " ")
                         .trim()
                         .replace(/ /g, ",")
                 ) + "]"),
-            choice // TODO fail NaN on choice (e.g. empty string)
+            choice
         }));
+        this.newEiChoices.clear();
         return m.request({
-            method: "POST",
+            method: "PATCH",
             url: SERVER_URL + "/ei",
             body: arr,
         });
@@ -149,7 +168,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
 
 
     getGenOutput() {
-        // Mithril type defs don't yet have responseType, since otherwise it'll just try and fail to read JSON
+        // Mithril type defs don't yet have responseType, but excluding will cause it to just try and fail to read JSON
         // @ts-ignore
         m.request({
             method: "GET",
@@ -173,23 +192,41 @@ export class RootTable extends MithrilTsxComponent<{ }> {
 
     view() {
         return (
-            <table>
-                <tbody>
-                <tr>
-                    <td>
-                        <button type="submit" onclick={() => {
-                            this.postEi().then(() => this.postGenOutput());
-                        }}>
-                            Rerun generator
-                        </button>
-                        <ExecutionIndexDisplay eiTableData={this.eiTableData}/>
-                    </td>
-                    <td>
-                        <GenOutputDisplay genOutput={this.genOutput}/>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <div>
+                <button type="submit" onclick={() => {
+                    this.updateEi().then(() => {
+                        this.getEi();
+                        this.postGenOutput();
+                    });
+                }}>
+                    Rerun generator
+                </button>
+                <div>
+                    <label>
+                        <input type="checkbox" id="showUnused" checked={this.showUnused}
+                               oninput={(e: Event) => {
+                                   console.log("checked:", this.showUnused)
+                                   this.showUnused = (e.target as HTMLInputElement).checked;
+                               }}
+                        />
+                        Show unused EI
+                    </label>
+                </div>
+                <table>
+                    <tbody>
+                    <tr>
+                        <td>
+
+                            <ExecutionIndexDisplay eiTableData={this.eiTableData} newEiChoices={this.newEiChoices}
+                                                   showUnused={this.showUnused}/>
+                        </td>
+                        <td>
+                            <GenOutputDisplay genOutput={this.genOutput}/>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         );
     }
 }

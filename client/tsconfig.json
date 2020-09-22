@@ -3,11 +3,18 @@
     "outDir": "./dist/",
     "sourceMap": true,
     "noImplicitAny": true,
-    "module": "ESNext",
+    "strictNullChecks": true,
+    "module": "ES2020",
     "jsx": "preserve",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "lib": [
+      "dom",
+      "es2020",
+      "scripthost",
+      "es2015.collection"
+    ]
   }
 }

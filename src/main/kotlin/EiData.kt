@@ -6,7 +6,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-data class EiData(val stackTrace: String, val choice: Int)
+data class EiData(val stackTrace: String, var choice: Int)
 
 /**
  * Represents an execution index without a stack trace, which is what is given back from POST requests.
@@ -21,7 +21,8 @@ data class EiWithoutStackTrace(val ei: @Serializable(with = ExecutionIndexSerial
 @Serializable
 data class EiWithData(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
                       val stackTrace: String,
-                      val choice: Int)
+                      val choice: Int,
+                      val used: Boolean)
 
 object ExecutionIndexSerializer : KSerializer<ExecutionIndex> {
     override val descriptor = ListSerializer(Int.serializer()).descriptor

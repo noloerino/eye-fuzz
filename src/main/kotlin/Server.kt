@@ -44,13 +44,20 @@ object Server {
         init()
         val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
         server.createContext("/ei", object : ResponseHandler("ei") {
+            /**
+             * GET returns a list of all EIs in the map.
+             */
             override fun onGet(): String {
-                val data = genGuidance.eiMap.map { (ei, value) -> EiWithData(ei, value.stackTrace, value.choice) }
+                val data = genGuidance.eiMap.map { (ei, value) ->
+                    EiWithData(ei, value.stackTrace, value.choice, ei in genGuidance.usedThisRun)
+                }
                 return Json.encodeToString(data)
             }
 
+            /**
+             * PATCH performs a full update to EIs, removing any EIs not included in this request.
+             */
             override fun onPost(reader: BufferedReader): String {
-                // POST expects parameters in a similar fashion, i.e. each line is int, space, EI array
                 val newEiMap = LinkedHashMap<ExecutionIndex, EiData>()
                 val text = reader.readText()
                 val arr = Json.decodeFromString<List<EiWithoutStackTrace>>(text)
@@ -60,6 +67,19 @@ object Server {
                     newEiMap[key] = EiData(genGuidance.eiMap[key]!!.stackTrace, choice)
                 }
                 genGuidance.eiMap = newEiMap
+                return "OK"
+            }
+
+            /**
+             * PATCH performs a partial update to EIs, leaving ones that weren't included in the request untouched.
+             */
+            override fun onPatch(reader: BufferedReader): String {
+                val text = reader.readText()
+                val arr = Json.decodeFromString<List<EiWithoutStackTrace>>(text)
+                for (e in arr) {
+                    val key = e.ei
+                    genGuidance.eiMap[key]!!.choice = e.choice
+                }
                 return "OK"
             }
         })
@@ -182,34 +202,41 @@ object Server {
     }
 
     private abstract class ResponseHandler(private val name: String?) : HttpHandler {
+
+        private val verbose = true //false
+
         override fun handle(httpExchange: HttpExchange) {
             val method = httpExchange.requestMethod
             val headers = httpExchange.responseHeaders
-//            println("$method /$name");
+            if (verbose) {
+                println("$method /$name");
+            }
             headers.add("Access-Control-Allow-Origin", "*")
-            headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+            headers.add("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS")
             headers.add("Access-Control-Allow-Headers", "Access-Control-Allow-Origin,Content-Type");
             var response = ""
+            fun endResponse() {
+                if (response.isEmpty()) {
+                    httpExchange.sendResponseHeaders(204, -1)
+                } else {
+                    httpExchange.sendResponseHeaders(200, response.length.toLong())
+                }
+            }
             when (method) {
                 "GET" -> {
                     response = onGet()
-                    if (response.isEmpty()) {
-                        httpExchange.sendResponseHeaders(204, -1)
-                    } else {
-                        httpExchange.sendResponseHeaders(200, response.length.toLong())
-                    }
+                    endResponse()
                 }
                 "POST" -> {
                     BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPost(reader) }
-                    if (response.isEmpty()) {
-                        httpExchange.sendResponseHeaders(204, -1)
-                    } else {
-                        httpExchange.sendResponseHeaders(200, response.length.toLong())
-                    }
+                    endResponse()
+                }
+                "PATCH" -> {
+                    BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPatch(reader) }
+                    endResponse()
                 }
                 "OPTIONS" -> {
                     httpExchange.sendResponseHeaders(204, -1)
-                    httpExchange.sendResponseHeaders(501, 0)
                 }
                 else -> httpExchange.sendResponseHeaders(501, 0)
             }
@@ -229,6 +256,14 @@ object Server {
          * @return the string to be written as a response
          */
         open fun onPost(reader: BufferedReader): String {
+            return ""
+        }
+
+        /**
+         * @param reader the request body
+         * @return the string to be written as a response
+         */
+        open fun onPatch(reader: BufferedReader): String {
             return ""
         }
     }
