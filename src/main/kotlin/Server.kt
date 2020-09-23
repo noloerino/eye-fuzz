@@ -8,9 +8,8 @@ import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
-import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent
-import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
-import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import edu.berkeley.cs.jqf.instrument.tracing.TraceLogger
+import edu.berkeley.cs.jqf.instrument.tracing.events.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -34,14 +33,111 @@ object Server {
     private val jsGen = JavaScriptCodeGenerator()
     private var genContents: String? = null
 
-    private val eventStrings: MutableMap<Int, String> = mutableMapOf()
+    @JvmField
+    val eventStrings: MutableMap<Int, String> = mutableMapOf()
 
     @JvmField
     val callLocations: MutableMap<Int, CallLocation> = mutableMapOf()
 
-    private val lock = ReentrantLock()
-    private val hasEiUpdate = lock.newCondition()
-    private val hasFinishedUpdate = lock.newCondition()
+    var mainThread: Thread? = null
+
+    /**
+     * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
+     * yield to the main thread by way of monitors in order to rerun the generator.
+     *
+     * The system is assumed to have a single writer (the main thread), but possibly multiple readers.
+     */
+    private enum class MainThreadTask {
+        RERUN_GENERATOR,
+        LOAD_FROM_FILE
+        ;
+
+        /**
+         * Issues a request for the writer associated with this state to eventually run doWork.
+         * The current thread becomes blocked until the task is completed.
+         */
+        fun requestWork() {
+            log("Issued work request for $this")
+            lock.lock()
+            try {
+                hasTask[this.ordinal] = true
+                taskQ.add(this)
+                writer.signal()
+            } finally {
+                lock.unlock()
+            }
+            // Between the above and below line, it is possible for another invocation for requestWork to slip in
+            // Therefore, we must be maintain a task queue rather than a single state variable
+            lock.lock()
+            try {
+                // The condition readers[i] is associated with the presence of task hasTask[i]
+                // We cannot rely on the queue being empty in case another work request was snuck in
+                // (strictly speaking, we should store ints instead of bools for this reason, but we're assuming
+                // only one request of each kind can be made at a time (which might actually be wrong)
+                while (hasTask[this.ordinal]) {
+                    readers[this.ordinal].await()
+                }
+            } finally {
+                lock.unlock()
+            }
+            log("Satisfied work request for $this")
+        }
+
+        /**
+         * Should be called on the main thread to signal the completion of a job.
+         */
+        fun signalCompletion() {
+            require(lock.isHeldByCurrentThread)
+            require(Thread.currentThread() == mainThread)
+            try {
+                hasTask[this.ordinal] = false
+                readers[this.ordinal].signal()
+            } finally {
+                lock.unlock()
+            }
+        }
+
+        companion object {
+            private var taskQ = mutableListOf<MainThreadTask>()
+            private val lock = ReentrantLock()
+            private val hasTask: MutableList<Boolean> = values().map { false }.toMutableList()
+            private val readers = values().map { lock.newCondition() }
+            private val writer = lock.newCondition()
+
+            private const val verbose = true
+
+            fun log(msg: String) {
+                if (verbose) {
+                    println(msg)
+                }
+            }
+
+            /**
+             * Causes the current thread to wait until a job is requested (i.e. the writer condition is signalled),
+             * at which point control is returned to the main thread.
+             *
+             * Unfortunately, this cannot be restructured to perform the task and then automatically signal waiters,
+             * as ExecutionIndex keeps track of a call stack. As such, the entry point to the generator must be invoked
+             * at the same location as it initially is.
+             *
+             * Must be called on the writer thread.
+             *
+             * @return the requested task item
+             * IMPORTANT: the lock is still held when this function is returned, so signal must be called eventually.
+             */
+            fun waitForJob(): MainThreadTask {
+                require(mainThread != null)
+                require(Thread.currentThread() == mainThread) { "Jobs must run on the main thread" }
+                lock.lock()
+                while (taskQ.isEmpty()) {
+                    writer.await()
+                }
+                val task = taskQ.removeFirst()
+                log("Servicing work request for $task (queue: $taskQ on thread ${Thread.currentThread()})")
+                return task
+            }
+        }
+    }
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -88,6 +184,7 @@ object Server {
             }
         })
         server.createContext("/save", SaveHandler())
+        server.createContext("/load", LoadHandler())
 //        server.createContext("/coverage",
 //                object : ResponseHandler("coverage") {
 //                    override fun onGet(): String {
@@ -99,28 +196,31 @@ object Server {
         server.createContext("/generator", genHandler)
         server.start()
         println("Server initialized at port " + server.address.port)
+        val taskMap: Map<MainThreadTask, () -> Unit> = mapOf(
+                MainThreadTask.RERUN_GENERATOR to { dummy() }
+        )
         while (true) {
-            lock.lock()
+            val task = MainThreadTask.waitForJob()
             try {
-                while (!genHandler.newEiUpdate) {
-                    hasEiUpdate.await()
-                }
-                dummy()
-                genHandler.newEiUpdate = false
-                hasFinishedUpdate.signal()
+                (taskMap[task] ?: {TODO()}).invoke()
+//                when (task) {
+//                    MainThreadTask.RERUN_GENERATOR -> dummy()
+//                    MainThreadTask.LOAD_FROM_FILE -> TODO()
+//                }
             } finally {
-                lock.unlock()
+                task.signalCompletion()
             }
         }
     }
 
     private fun init() {
+        mainThread = Thread.currentThread()
         System.setProperty("jqf.traceGenerators", "true")
-        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
+//        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
         //        String target = JavaScriptCodeGenerator.class.getName() + "#generate";
-        val target = Server::class.java.name + "#dummy"
-        SingleSnoop.startSnooping(target)
-        println(SingleSnoop.entryPoints)
+//        val target = Server::class.java.name + "#dummy"
+//        SingleSnoop.startSnooping(target)
+//        println(SingleSnoop.entryPoints)
         // Needed for some jank call tracking
         dummy()
         println("Initial map is of size " + genGuidance.eiMap.size)
@@ -131,6 +231,11 @@ object Server {
      * Returns should probably stop tracking at runGenerator to avoid an oob exception.
      */
     private fun dummy() {
+        TraceLogger.get().remove()
+        val target = Server::class.java.name + "#runGenerator"
+        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
+        SingleSnoop.startSnooping(target)
+        println(SingleSnoop.entryPoints)
         genGuidance.reset()
         runGenerator()
     }
@@ -156,24 +261,29 @@ object Server {
 
     @JvmStatic
     fun eventToString(e: TraceEvent): String {
-        return when (e) {
-            is BranchEvent -> {
-                eventStrings.computeIfAbsent(e.iid) {
+        return eventStrings.computeIfAbsent(e.iid) {
+            when (e) {
+                is BranchEvent -> {
                     String.format("(branch) %s#%s()@%d [%d]", e.containingClass, e.containingMethodName,
                             e.lineNumber, e.arm)
                 }
-            }
-            is CallEvent -> {
-                callLocations.computeIfAbsent(e.iid) {
-                    CallLocation(e.iid, e.containingClass, e.containingMethodName, e.lineNumber, e.invokedMethodName)
-                }
-                eventStrings.computeIfAbsent(e.iid) {
+                is CallEvent -> {
+                    callLocations.computeIfAbsent(e.iid) {
+                        CallLocation(e.iid, e.containingClass, e.containingMethodName, e.lineNumber, e.invokedMethodName)
+                    }
                     String.format("(call) %s#%s()@%d --> %s", e.containingClass, e.containingMethodName,
                             e.lineNumber, e.invokedMethodName)
                 }
-            }
-            else -> {
-                eventStrings.computeIfAbsent(e.iid) {
+                is ReturnEvent -> {
+                    "(return) ${e.containingClass}#${e.containingMethodName}"
+                }
+                is AllocEvent -> {
+                    "(alloc) size ${e.size} ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
+                }
+                is ReadEvent -> {
+                    "(read) ${e.field} in ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
+                }
+                else -> {
                     String.format("(other) %s#%s()@%d", e.containingClass, e.containingMethodName, e.lineNumber)
                 }
             }
@@ -189,34 +299,18 @@ object Server {
         override fun onPost(reader: BufferedReader): String {
             // Need to yield back to main thread, which is running a loop with a monitor
             // that just runs the generator when notified
-            lock.lock()
-            try {
-                newEiUpdate = true
-                hasEiUpdate.signal()
-            } finally {
-                lock.unlock()
-            }
-            lock.lock()
-            try {
-                while (newEiUpdate) {
-                    hasFinishedUpdate.await()
-                }
-            } finally {
-                lock.unlock()
-            }
+            MainThreadTask.RERUN_GENERATOR.requestWork()
             println("Updated generator contents (map is of size " + genGuidance.eiMap.size + ")")
             return getGenContents()
         }
     }
 
+    val saveDir = File("savedInputs")
+    init {
+        assert(saveDir.mkdirs())
+    }
+
     private class SaveHandler : ResponseHandler("save") {
-
-        val saveDir = File("savedInputs")
-
-        init {
-            assert(saveDir.mkdirs())
-        }
-
         @Serializable
         data class SaveRequest(val fileName: String)
 
@@ -228,6 +322,23 @@ object Server {
             println("Saving last run to ${saveFile.canonicalPath}")
             genGuidance.writeLastRunToFile(saveFile)
             return "OK"
+        }
+    }
+
+    private class LoadHandler : ResponseHandler("load") {
+        @Serializable
+        data class LoadRequest(val fileName: String)
+
+        override fun onGet(): String {
+            return Json.encodeToString<List<String>>(saveDir.list()!!.toList())
+        }
+
+        /**
+         * Replaces the current values in the EI map with the values in the specified file.
+         */
+        override fun onPost(reader: BufferedReader): String {
+            // TODO handle error case i guess
+            return ""
         }
     }
 

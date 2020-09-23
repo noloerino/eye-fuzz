@@ -142,11 +142,11 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 for (let {ei, stackTrace, choice, used} of arr) {
                     const targetClass = "JavaScriptCodeGenerator";
                     let filteredStackTrace: StackTraceLine[] =
-                        // stackTrace;
-                        stackTrace.filter((l: StackTraceLine) =>
-                            (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
-                        );
+                        stackTrace;
+                        // stackTrace.filter((l: StackTraceLine) =>
+                        //     (l.callLocation.containingClass.indexOf(targetClass) >= 0)
+                        //     || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                        // );
                     let eiString = "";
                     for (let i = 0; i < ei.length; i += 2) {
                         eiString += ei[i] + " (" + ei[i + 1] + ")\n"
@@ -241,7 +241,6 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     <label>
                         <input type="checkbox" id="showUnused" checked={this.showUnused}
                                oninput={(e: Event) => {
-                                   console.log("checked:", this.showUnused)
                                    this.showUnused = (e.target as HTMLInputElement).checked;
                                }}
                         />

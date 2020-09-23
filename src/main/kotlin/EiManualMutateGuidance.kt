@@ -46,7 +46,10 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
         get() = (0 until eiState.depth + 1).map { i ->
             val iid = eiState.rollingIndex[2 * i]
             val count = eiState.rollingIndex[2 * i + 1]
-            StackTraceLine(Server.callLocations[iid]!!, count)
+            val callLocation = Server.callLocations[iid] ?:
+                // TODO account for branches etc. at the top of the stack trace
+                CallLocation(iid, Server.eventStrings[iid]!!, "", 0, "")
+            StackTraceLine(callLocation, count)
         }
 
     override fun getInput(): InputStream {
@@ -77,7 +80,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     }
 
     override fun generateCallBack(thread: Thread): Consumer<TraceEvent> {
-        check(appThread == null) { "Guidance must run on main thread" }
+        check(appThread == null || appThread == thread) { "Guidance must stay on the same thread" }
         appThread = thread
         SingleSnoop.entryPoints[thread] ?: throw IllegalStateException("Guidance must be able to determine entry point")
         return Consumer { e: TraceEvent -> handleEvent(e) }
@@ -96,7 +99,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
         //            System.out.println("BEGIN VISIT");
         when (e) {
             is CallEvent -> {
-                if (e.getContainingMethodName() == "runGenerator") {
+                if (e.containingMethodName == "runGenerator") {
 //            if (((CallEvent) e).getInvokedMethodName().equals("Server#dummy()V")) {
                     isTracking = true
                 }
@@ -104,14 +107,13 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
                 log("CALL $trackedString: $contents")
             }
             is ReturnEvent -> {
-                val evString = e.getContainingClass() + "#" + e.getContainingMethodName()
 //                if (evString.equals("com/pholser/junit/quickcheck/internal/GeometricDistribution#<init>")) {
 //                if (evString.equals("Server#runGenerator")) {
-                if (evString.contains("dummy")) {
+                if (contents.contains("Server#runGenerator")) {
                     isTracking = false
                 }
                 val trackedString = if (isTracking) "*tracked" else "untracked"
-                log("RET $trackedString: $evString")
+                log("RET $trackedString: $contents")
             }
             else -> {
                 val trackedString = if (isTracking) "*tracked" else "untracked"
@@ -140,6 +142,6 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     }
 
     companion object {
-        private const val verbose = false
+        private const val verbose = true
     }
 }
