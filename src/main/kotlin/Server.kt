@@ -48,16 +48,26 @@ object Server {
      * The system is assumed to have a single writer (the main thread), but possibly multiple readers.
      */
     private enum class MainThreadTask {
-        RERUN_GENERATOR,
-        LOAD_FROM_FILE
+        RERUN_GENERATOR {
+            override fun job() {
+                dummy()
+            }
+        },
+        LOAD_FROM_FILE {
+            override fun job() {
+                TODO("Not yet implemented")
+            }
+        }
         ;
+
+        abstract fun job();
 
         /**
          * Issues a request for the writer associated with this state to eventually run doWork.
          * The current thread becomes blocked until the task is completed.
          */
         fun requestWork() {
-            log("Issued work request for $this")
+            log("Issued work request for $this from thread ${Thread.currentThread()}")
             lock.lock()
             try {
                 hasTask[this.ordinal] = true
@@ -80,21 +90,7 @@ object Server {
             } finally {
                 lock.unlock()
             }
-            log("Satisfied work request for $this")
-        }
-
-        /**
-         * Should be called on the main thread to signal the completion of a job.
-         */
-        fun signalCompletion() {
-            require(lock.isHeldByCurrentThread)
-            require(Thread.currentThread() == mainThread)
-            try {
-                hasTask[this.ordinal] = false
-                readers[this.ordinal].signal()
-            } finally {
-                lock.unlock()
-            }
+            log("Acknowledged completion work request for $this on thread ${Thread.currentThread()}")
         }
 
         companion object {
@@ -113,28 +109,30 @@ object Server {
             }
 
             /**
-             * Causes the current thread to wait until a job is requested (i.e. the writer condition is signalled),
-             * at which point control is returned to the main thread.
-             *
-             * Unfortunately, this cannot be restructured to perform the task and then automatically signal waiters,
-             * as ExecutionIndex keeps track of a call stack. As such, the entry point to the generator must be invoked
-             * at the same location as it initially is.
+             * Causes the current thread to wait until a job is requested (i.e. the writer condition is signalled).
+             * The task is then performed on the main thread, and upon completion, the thread's waiters are signalled.
              *
              * Must be called on the writer thread.
              *
              * @return the requested task item
-             * IMPORTANT: the lock is still held when this function is returned, so signal must be called eventually.
              */
-            fun waitForJob(): MainThreadTask {
+            fun waitForJob() {
                 require(mainThread != null)
                 require(Thread.currentThread() == mainThread) { "Jobs must run on the main thread" }
                 lock.lock()
-                while (taskQ.isEmpty()) {
-                    writer.await()
+                try {
+                    while (taskQ.isEmpty()) {
+                        writer.await()
+                    }
+                    val task = taskQ.removeFirst()
+                    log("Servicing work request for $task (queue: $taskQ)")
+                    hasTask[task.ordinal] = false
+                    readers[task.ordinal].signal()
+                    task.job()
+                    log("Completed work request for $task (queue: $taskQ)")
+                } finally {
+                    lock.unlock()
                 }
-                val task = taskQ.removeFirst()
-                log("Servicing work request for $task (queue: $taskQ on thread ${Thread.currentThread()})")
-                return task
             }
         }
     }
@@ -197,15 +195,7 @@ object Server {
         server.start()
         println("Server initialized at port " + server.address.port)
         while (true) {
-            val task = MainThreadTask.waitForJob()
-            try {
-                when (task) {
-                    MainThreadTask.RERUN_GENERATOR -> dummy()
-                    MainThreadTask.LOAD_FROM_FILE -> TODO()
-                }
-            } finally {
-                task.signalCompletion()
-            }
+            MainThreadTask.waitForJob()
         }
     }
 
@@ -286,7 +276,6 @@ object Server {
     }
 
     private class GenHandler(name: String?) : ResponseHandler(name) {
-        var newEiUpdate = false
         override fun onGet(): String {
             return getGenContents()
         }
