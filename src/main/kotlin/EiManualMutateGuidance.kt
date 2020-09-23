@@ -7,6 +7,7 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import java.io.File
 import java.io.InputStream
 import java.util.*
 import java.util.function.Consumer
@@ -23,10 +24,13 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     private var hasRun = false
 
     /**
-     * Tracks which EIs were used in the most recent run of the generator
+     * Tracks which EIs were used in the most recent run of the generator.
+     *
+     * Since EIs are unique (as visiting the same location twice would result in an incremented count),
+     * we're able to use a LinkedSet instead of an ordinary list.
      */
-    val usedThisRun = mutableSetOf<ExecutionIndex>()
-    var eiMap = LinkedHashMap<ExecutionIndex, EiData>()
+    val usedThisRun = linkedSetOf<ExecutionIndex>()
+    var eiMap = linkedMapOf<ExecutionIndex, EiData>()
 
     fun reset() {
         eiState = EiState()
@@ -56,7 +60,9 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
                 log("\tREAD " + eventToString(lastEvent!!))
                 usedThisRun.add(executionIndex)
                 // Attempt to get a value from the map, or else generate a random value
-                return eiMap.computeIfAbsent(executionIndex) { EiData(fullStackTrace, rng.nextInt(256)) }.choice
+                return eiMap.computeIfAbsent(executionIndex) {
+                    EiData(fullStackTrace, rng.nextInt(256).toByte())
+                }.choice.toInt()
             }
         }
     }
@@ -117,6 +123,20 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
         }
         lastEvent = e
         //            System.out.println("END VISIT");
+    }
+
+    /**
+     * Produces the sequence of bytes produced by the most recent input.
+     *
+     * This emulates the behavior of Zest's ExecutionIndexingGuidance.MappedInput, which
+     * simply produces all the bytes in the order that they were requested.
+     */
+    private fun getLastRunBytes(): ByteArray {
+        return usedThisRun.map { k -> eiMap[k]!!.choice }.toByteArray()
+    }
+
+    fun writeLastRunToFile(dest: File) {
+        dest.writeBytes(getLastRunBytes())
     }
 
     companion object {

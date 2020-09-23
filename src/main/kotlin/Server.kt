@@ -11,10 +11,12 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.util.*
@@ -32,7 +34,7 @@ object Server {
     private val jsGen = JavaScriptCodeGenerator()
     private var genContents: String? = null
 
-    val eventStrings: MutableMap<Int, String> = mutableMapOf()
+    private val eventStrings: MutableMap<Int, String> = mutableMapOf()
 
     @JvmField
     val callLocations: MutableMap<Int, CallLocation> = mutableMapOf()
@@ -85,13 +87,14 @@ object Server {
                 return "OK"
             }
         })
-        server.createContext("/coverage",
-                object : ResponseHandler("coverage") {
-                    override fun onGet(): String {
-                        return ""
-                    }
-                }
-        )
+        server.createContext("/save", SaveHandler())
+//        server.createContext("/coverage",
+//                object : ResponseHandler("coverage") {
+//                    override fun onGet(): String {
+//                        return ""
+//                    }
+//                }
+//        )
         val genHandler = GenHandler("generator")
         server.createContext("/generator", genHandler)
         server.start()
@@ -203,6 +206,28 @@ object Server {
             }
             println("Updated generator contents (map is of size " + genGuidance.eiMap.size + ")")
             return getGenContents()
+        }
+    }
+
+    private class SaveHandler : ResponseHandler("save") {
+
+        val saveDir = File("savedInputs")
+
+        init {
+            assert(saveDir.mkdirs())
+        }
+
+        @Serializable
+        data class SaveRequest(val fileName: String)
+
+        override fun onPost(reader: BufferedReader): String {
+            val text = reader.readText()
+            val saveRequest = Json.decodeFromString<SaveRequest>(text)
+            // just kinda assume the file exists I guess...
+            val saveFile = saveDir.toPath().resolve(saveRequest.fileName).toFile()
+            println("Saving last run to ${saveFile.canonicalPath}")
+            genGuidance.writeLastRunToFile(saveFile)
+            return "OK"
         }
     }
 

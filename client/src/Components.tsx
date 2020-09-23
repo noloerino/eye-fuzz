@@ -35,56 +35,54 @@ interface EiWithData {
 class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAttrs> {
     view(vnode: Vnode<ExecutionIndexDisplayAttrs, this>) {
         return (
-            <form id="rerunGenForm" method="POST" action="http://localhost:8000/generator">
-                <table>
-                    <thead>
-                    <tr>
-                        <th scope="col">ExecutionIndex</th>
-                        <th scope="col">Used</th>
-                        <th scope="col">Stack Trace</th>
-                        <th scope="col">Old Value</th>
-                        <th scope="col">New Value</th>
-                    </tr>
-                    </thead>
-                    <tbody id="eiTableBody">
-                    {vnode.attrs.eiTableData.flatMap(({ei, stackTrace, choice, used}, i) => (
-                        (vnode.attrs.showUnused || used) ? [(
-                            <tr>
-                                <td className="eiCell" style={{
-                                    maxWidth: "20em",
-                                    overflow: "scroll",
-                                    textOverflow: "clip",
-                                }}>
-                                    {ei}
-                                </td>
-                                <td>
-                                    <input type="checkbox" disabled={true} checked={used} />
-                                </td>
-                                <td style={{whiteSpace: "pre-wrap"}}>
-                                    {stackTrace.map(serializeStackTraceLine).join("\n")}
-                                </td>
-                                <td>
-                                    <span>{choice}</span>
-                                </td>
-                                <td>
-                                    <input type="number" min={0} max={255} value={vnode.attrs.newEiChoices.get(i) ?? ""}
-                                        oninput={(e: InputEvent) => {
-                                            let value = (e.target as HTMLInputElement)?.value ?? "";
-                                            if (value === "") {
-                                                vnode.attrs.newEiChoices.delete(i);
-                                            } else {
-                                                // TODO ceiling/floor this
-                                                vnode.attrs.newEiChoices.set(i, parseInt(value));
-                                            }
-                                        }}
-                                    />
-                                </td>
-                            </tr>
-                        )] : []
-                    ))}
-                    </tbody>
-                </table>
-            </form>
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">ExecutionIndex</th>
+                    <th scope="col">Used</th>
+                    <th scope="col">Stack Trace</th>
+                    <th scope="col">Old Value</th>
+                    <th scope="col">New Value</th>
+                </tr>
+                </thead>
+                <tbody id="eiTableBody">
+                {vnode.attrs.eiTableData.flatMap(({ei, stackTrace, choice, used}, i) => (
+                    (vnode.attrs.showUnused || used) ? [(
+                        <tr>
+                            <td className="eiCell" style={{
+                                maxWidth: "20em",
+                                overflow: "scroll",
+                                textOverflow: "clip",
+                            }}>
+                                {ei}
+                            </td>
+                            <td>
+                                <input type="checkbox" disabled={true} checked={used} />
+                            </td>
+                            <td style={{whiteSpace: "pre-wrap"}}>
+                                {stackTrace.map(serializeStackTraceLine).join("\n")}
+                            </td>
+                            <td>
+                                <span>{choice}</span>
+                            </td>
+                            <td>
+                                <input type="number" min={0} max={255} value={vnode.attrs.newEiChoices.get(i) ?? ""}
+                                    oninput={(e: InputEvent) => {
+                                        let value = (e.target as HTMLInputElement)?.value ?? "";
+                                        if (value === "") {
+                                            vnode.attrs.newEiChoices.delete(i);
+                                        } else {
+                                            // TODO ceiling/floor this
+                                            vnode.attrs.newEiChoices.set(i, parseInt(value));
+                                        }
+                                    }}
+                                />
+                            </td>
+                        </tr>
+                    )] : []
+                ))}
+                </tbody>
+            </table>
         )
     }
 }
@@ -127,6 +125,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     newEiChoices: Map<number, number> = new Map();
     genOutput: string = "";
     showUnused: boolean = true;
+    saveFileName: string | undefined;
 
     oninit() {
         this.getGenOutput();
@@ -212,15 +211,33 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     view() {
         return (
             <div>
-                <button type="submit" onclick={() => {
-                    this.updateEi().then(() => {
-                        this.getEi();
-                        this.postGenOutput();
-                    });
-                }}>
-                    Rerun generator
-                </button>
-                <div>
+                <div id="controlPanel">
+                    <button type="submit" onclick={() => {
+                        this.updateEi().then(() => {
+                            this.getEi();
+                            this.postGenOutput();
+                        });
+                    }}>
+                        Rerun generator
+                    </button>
+                    <form method="POST" onsubmit={(e: Event) => {
+                        e.preventDefault();
+                        m.request({
+                            method: "POST",
+                            url: SERVER_URL + "/save",
+                            body: {fileName: this.saveFileName},
+                        }).then(() => console.log("Saved file (probably)"));
+                        this.saveFileName = undefined;
+                    }}>
+                        <label>
+                            Save last input to file:
+                            <input type="text" value={this.saveFileName} required oninput={(e: InputEvent) =>
+                                this.saveFileName = (e.target!! as HTMLInputElement).value
+                            }/>
+                        </label>
+                        {/* TODO add feeback for save success/fail */}
+                        <button type="submit">Save</button>
+                    </form>
                     <label>
                         <input type="checkbox" id="showUnused" checked={this.showUnused}
                                oninput={(e: Event) => {
@@ -235,7 +252,6 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     <tbody>
                     <tr>
                         <td>
-
                             <ExecutionIndexDisplay eiTableData={this.eiTableData} newEiChoices={this.newEiChoices}
                                                    showUnused={this.showUnused}/>
                         </td>
