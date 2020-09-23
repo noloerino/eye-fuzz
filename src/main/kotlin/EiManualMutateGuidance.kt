@@ -64,8 +64,8 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
                 usedThisRun.add(executionIndex)
                 // Attempt to get a value from the map, or else generate a random value
                 return eiMap.computeIfAbsent(executionIndex) {
-                    EiData(fullStackTrace, rng.nextInt(256).toByte())
-                }.choice.toInt()
+                    EiData(fullStackTrace, rng.nextInt(256))
+                }.choice
             }
         }
     }
@@ -134,7 +134,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      * simply produces all the bytes in the order that they were requested.
      */
     private fun getLastRunBytes(): ByteArray {
-        return usedThisRun.map { k -> eiMap[k]!!.choice }.toByteArray()
+        return usedThisRun.map { k -> eiMap[k]!!.choice.toByte() }.toByteArray()
     }
 
     fun writeLastRunToFile(dest: File) {
@@ -142,6 +142,6 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     }
 
     companion object {
-        private const val verbose = true
+        private const val verbose = false
     }
 }

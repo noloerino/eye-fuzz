@@ -142,11 +142,11 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 for (let {ei, stackTrace, choice, used} of arr) {
                     const targetClass = "JavaScriptCodeGenerator";
                     let filteredStackTrace: StackTraceLine[] =
-                        stackTrace;
-                        // stackTrace.filter((l: StackTraceLine) =>
-                        //     (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                        //     || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
-                        // );
+                        // stackTrace;
+                        stackTrace.filter((l: StackTraceLine) =>
+                            (l.callLocation.containingClass.indexOf(targetClass) >= 0)
+                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                        );
                     let eiString = "";
                     for (let i = 0; i < ei.length; i += 2) {
                         eiString += ei[i] + " (" + ei[i + 1] + ")\n"
@@ -212,12 +212,11 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         return (
             <div>
                 <div id="controlPanel">
-                    <button type="submit" onclick={() => {
-                        this.updateEi().then(() => {
-                            this.getEi();
-                            this.postGenOutput();
-                        });
-                    }}>
+                    <button type="submit" onclick={() =>
+                        this.updateEi()
+                            .then(() => this.postGenOutput())
+                            .then(() => this.getEi())
+                    }>
                         Rerun generator
                     </button>
                     <form method="POST" onsubmit={(e: Event) => {

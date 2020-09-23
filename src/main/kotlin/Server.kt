@@ -196,17 +196,13 @@ object Server {
         server.createContext("/generator", genHandler)
         server.start()
         println("Server initialized at port " + server.address.port)
-        val taskMap: Map<MainThreadTask, () -> Unit> = mapOf(
-                MainThreadTask.RERUN_GENERATOR to { dummy() }
-        )
         while (true) {
             val task = MainThreadTask.waitForJob()
             try {
-                (taskMap[task] ?: {TODO()}).invoke()
-//                when (task) {
-//                    MainThreadTask.RERUN_GENERATOR -> dummy()
-//                    MainThreadTask.LOAD_FROM_FILE -> TODO()
-//                }
+                when (task) {
+                    MainThreadTask.RERUN_GENERATOR -> dummy()
+                    MainThreadTask.LOAD_FROM_FILE -> TODO()
+                }
             } finally {
                 task.signalCompletion()
             }
@@ -235,7 +231,6 @@ object Server {
         val target = Server::class.java.name + "#runGenerator"
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
         SingleSnoop.startSnooping(target)
-        println(SingleSnoop.entryPoints)
         genGuidance.reset()
         runGenerator()
     }
