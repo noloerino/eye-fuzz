@@ -53,14 +53,19 @@ object Server {
                 dummy()
             }
         },
+
+        /**
+         * This job must be requested within the context provided by genGuidance.reproWithFile.
+         */
         LOAD_FROM_FILE {
             override fun job() {
-                TODO("Not yet implemented")
+                require(genGuidance.isInReproMode) { "Repro job was requested outside guidance repro mode"}
+                dummy()
             }
         }
         ;
 
-        abstract fun job();
+        abstract fun job()
 
         /**
          * Issues a request for the writer associated with this state to eventually run doWork.
@@ -223,6 +228,7 @@ object Server {
         SingleSnoop.startSnooping(target)
         genGuidance.reset()
         runGenerator()
+        println("Updated generator contents (map is of size " + genGuidance.eiMap.size + ")")
     }
 
     private fun getGenContents(): String {
@@ -284,14 +290,17 @@ object Server {
             // Need to yield back to main thread, which is running a loop with a monitor
             // that just runs the generator when notified
             MainThreadTask.RERUN_GENERATOR.requestWork()
-            println("Updated generator contents (map is of size " + genGuidance.eiMap.size + ")")
             return getGenContents()
         }
     }
 
     val saveDir = File("savedInputs")
     init {
-        assert(saveDir.mkdirs())
+        assert(saveDir.mkdirs()) { "Unable to create saved input directory at $saveDir" }
+    }
+
+    private fun resolveSaveFile(fileName: String): File {
+        return saveDir.toPath().resolve(fileName).toFile()
     }
 
     private class SaveHandler : ResponseHandler("save") {
@@ -302,7 +311,7 @@ object Server {
             val text = reader.readText()
             val saveRequest = Json.decodeFromString<SaveRequest>(text)
             // just kinda assume the file exists I guess...
-            val saveFile = saveDir.toPath().resolve(saveRequest.fileName).toFile()
+            val saveFile = resolveSaveFile(saveRequest.fileName)
             println("Saving last run to ${saveFile.canonicalPath}")
             genGuidance.writeLastRunToFile(saveFile)
             return "OK"
@@ -313,6 +322,9 @@ object Server {
         @Serializable
         data class LoadRequest(val fileName: String)
 
+        /**
+         * Returns a list of all saved inputs available for repro.
+         */
         override fun onGet(): String {
             return Json.encodeToString<List<String>>(saveDir.list()!!.toList())
         }
@@ -321,8 +333,15 @@ object Server {
          * Replaces the current values in the EI map with the values in the specified file.
          */
         override fun onPost(reader: BufferedReader): String {
+            val text = reader.readText()
+            val loadRequest = Json.decodeFromString<LoadRequest>(text)
             // TODO handle error case i guess
-            return ""
+            val loadFile = resolveSaveFile(loadRequest.fileName)
+            println("Loading run from last run from ${loadFile.canonicalPath}")
+            genGuidance.reproWithFile(loadFile).use {
+                MainThreadTask.LOAD_FROM_FILE.requestWork()
+            }
+            return "OK"
         }
     }
 

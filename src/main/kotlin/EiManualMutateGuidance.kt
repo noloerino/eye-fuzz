@@ -7,6 +7,7 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import java.io.Closeable
 import java.io.File
 import java.io.InputStream
 import java.util.*
@@ -32,6 +33,30 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     val usedThisRun = linkedSetOf<ExecutionIndex>()
     var eiMap = linkedMapOf<ExecutionIndex, EiData>()
 
+    /**
+     * A stream of integers that will be consumed to fill values in the EI map.
+     * Should be null when not performing repro runs.
+     */
+    private var reproValues: Iterator<Int>? = null
+
+    val isInReproMode: Boolean get() = reproValues != null
+
+    /**
+     * Sets the guidance to read input bytes from the provided file. This automatically calls `reset` to start
+     * a new run, and clears the existing EI map.
+     *
+     * Until the returned closeable is closed, this guidance can only be used for repro; otherwise, the guidance
+     * will read from saved values in the map.
+     */
+    fun reproWithFile(file: File): Closeable {
+        this.reset()
+        eiMap.clear()
+        reproValues = file.readBytes().asSequence().map { it.toInt() and 0xFF }.iterator()
+        return Closeable {
+            reproValues = null
+        }
+    }
+
     fun reset() {
         eiState = EiState()
         hasRun = false
@@ -46,12 +71,15 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
         get() = (0 until eiState.depth + 1).map { i ->
             val iid = eiState.rollingIndex[2 * i]
             val count = eiState.rollingIndex[2 * i + 1]
-            val callLocation = Server.callLocations[iid] ?:
-                // TODO account for branches etc. at the top of the stack trace
-                CallLocation(iid, Server.eventStrings[iid]!!, "", 0, "")
+            val callLocation = Server.callLocations[iid]!!
             StackTraceLine(callLocation, count)
         }
 
+    /**
+     * When this object is not in repro mode (invoked through `reproWithFile`), this will read existing bytes from
+     * the EI map and generate new bytes as necessary. In repro mode, this will read the next byte in the passed
+     * in iterator.
+     */
     override fun getInput(): InputStream {
         return object : InputStream() {
             override fun read(): Int {
@@ -64,7 +92,10 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
                 usedThisRun.add(executionIndex)
                 // Attempt to get a value from the map, or else generate a random value
                 return eiMap.computeIfAbsent(executionIndex) {
-                    EiData(fullStackTrace, rng.nextInt(256))
+                    EiData(
+                            fullStackTrace,
+                            reproValues?.next() ?: rng.nextInt(256)
+                    )
                 }.choice
             }
         }
