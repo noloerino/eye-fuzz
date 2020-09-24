@@ -126,10 +126,13 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     genOutput: string = "";
     showUnused: boolean = true;
     saveFileName: string | undefined;
+    loadFileName: string | undefined;
+    availableLoadFiles: string[] | undefined;
 
     oninit() {
-        this.getGenOutput();
-        this.getEi();
+        this.getGenOutput(),
+        this.getEi(),
+        this.getLoadFiles()
     }
 
     getEi() {
@@ -194,8 +197,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             responseType: "text",
         })
             .then((responseText: any) => {
-                this.genOutput = responseText
-            })
+                this.genOutput = responseText;
+            });
             // .catch(e => this.genOutput = "ERROR " + e);
     }
 
@@ -204,8 +207,18 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             method: "POST",
             url: SERVER_URL + "/generator",
         })
-            .then(() => this.getGenOutput())
+            .then(() => this.getGenOutput());
             // .catch(e => this.genOutput = "ERROR " + e);
+    }
+
+    getLoadFiles() {
+        m.request({
+            method: "GET",
+            url: SERVER_URL + "/load",
+        })
+            .then((files: string[]) => {
+                this.availableLoadFiles = files;
+            });
     }
 
     view() {
@@ -219,13 +232,14 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     }>
                         Rerun generator
                     </button>
-                    <form method="POST" onsubmit={(e: Event) => {
+                    <form id="saveForm" method="POST" onsubmit={(e: Event) => {
+                        let saveFileName = this.saveFileName;
                         e.preventDefault();
                         m.request({
                             method: "POST",
                             url: SERVER_URL + "/save",
-                            body: {fileName: this.saveFileName},
-                        }).then(() => console.log("Saved file (probably)"));
+                            body: {fileName: saveFileName},
+                        }).then(() => console.log("Saved file", saveFileName, "(probably)"));
                         this.saveFileName = undefined;
                     }}>
                         <label>
@@ -234,8 +248,38 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 this.saveFileName = (e.target!! as HTMLInputElement).value
                             }/>
                         </label>
-                        {/* TODO add feeback for save success/fail */}
+                        {/* TODO add feedback for save success/fail */}
                         <button type="submit">Save</button>
+                    </form>
+                    <form id="loadForm" method="POST" onsubmit={(e: Event) => {
+                        let loadFileName = this.loadFileName;
+                        e.preventDefault();
+                        if (loadFileName) {
+                            m.request({
+                                method: "POST",
+                                url: SERVER_URL + "/load",
+                                body: {fileName: loadFileName},
+                            })
+                                .then(() => console.log("Loaded file", loadFileName))
+                                .then(() => Promise.all([this.getEi(), this.getGenOutput()]))
+                            ;
+                            this.loadFileName = undefined;
+                        }
+                    }}>
+                        <label>
+                            Load input file:
+                            <select value={this.loadFileName} onchange={(e: Event) => {
+                                this.loadFileName = (e.target!! as HTMLSelectElement).value;
+                            }}>
+                                <option value=""/>
+                                {
+                                    this.availableLoadFiles?.map((fileName: string) =>
+                                        <option value={fileName}>{fileName}</option>)
+                                }
+                            </select>
+                        </label>
+                        {/* TODO add feedback for save success/fail */}
+                        <button type="submit">Load</button>
                     </form>
                     <label>
                         <input type="checkbox" id="showUnused" checked={this.showUnused}
