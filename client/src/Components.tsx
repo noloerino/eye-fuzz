@@ -52,25 +52,31 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     (vnode.attrs.showUnused || used) ? [(
                         <tr>
                             <td className="eiCell" style={{
-                                maxWidth: "20em",
+                                maxWidth: "10em",
                                 overflow: "scroll",
                                 textOverflow: "clip",
+                                whiteSpace: "pre-wrap"
                             }}>
                                 {ei}
                             </td>
-                            <td>
+                            <td style={{textAlign: "center"}}>
                                 {eiHash}
                             </td>
-                            <td>
+                            <td style={{textAlign: "center"}}>
                                 <input type="checkbox" disabled={true} checked={used} />
                             </td>
-                            <td style={{whiteSpace: "pre-wrap"}}>
+                            <td className="stackTraceCell" style={{
+                                maxWidth: "60em",
+                                overflow: "scroll",
+                                textOverflow: "clip",
+                                whiteSpace: "pre-wrap"
+                            }}>
                                 {stackTrace.map(serializeStackTraceLine).join("\n")}
                             </td>
-                            <td>
+                            <td style={{textAlign: "center"}}>
                                 <span>{choice}</span>
                             </td>
-                            <td>
+                            <td style={{textAlign: "center"}}>
                                 <input type="number" min={0} max={255} value={vnode.attrs.newEiChoices.get(i) ?? ""}
                                     oninput={(e: InputEvent) => {
                                         let value = (e.target as HTMLInputElement)?.value ?? "";
@@ -249,7 +255,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         this.saveFileName = undefined;
                     }}>
                         <label>
-                            Save last input to file:
+                            Save last input to file:{" "}
                             <input type="text" value={this.saveFileName} required oninput={(e: InputEvent) =>
                                 this.saveFileName = (e.target!! as HTMLInputElement).value
                             }/>
@@ -273,7 +279,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         }
                     }}>
                         <label>
-                            Load input file:
+                            Load input file:{" "}
                             <select value={this.loadFileName} onchange={(e: Event) => {
                                 this.loadFileName = (e.target!! as HTMLSelectElement).value;
                             }}>
