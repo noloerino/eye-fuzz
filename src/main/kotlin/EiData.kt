@@ -22,7 +22,10 @@ data class EiWithoutStackTrace(val ei: @Serializable(with = ExecutionIndexSerial
 data class EiWithData(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
                       val stackTrace: StackTrace,
                       val choice: Int,
-                      val used: Boolean)
+                      val used: Boolean) {
+    @Suppress("unused")
+    val eiHash = ei.hashCode()
+}
 
 
 typealias StackTrace = List<StackTraceLine>

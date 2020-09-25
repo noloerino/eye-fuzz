@@ -27,6 +27,7 @@ function serializeStackTraceLine(l: StackTraceLine): string {
 
 interface EiWithData {
     ei: string;
+    eiHash: string;
     choice: number;
     stackTrace: StackTraceLine[];
     used: boolean;
@@ -39,6 +40,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                 <thead>
                 <tr>
                     <th scope="col">ExecutionIndex</th>
+                    <th scope="col">Hash</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
                     <th scope="col">Old Value</th>
@@ -46,7 +48,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                 </tr>
                 </thead>
                 <tbody id="eiTableBody">
-                {vnode.attrs.eiTableData.flatMap(({ei, stackTrace, choice, used}, i) => (
+                {vnode.attrs.eiTableData.flatMap(({ei, eiHash, stackTrace, choice, used}, i) => (
                     (vnode.attrs.showUnused || used) ? [(
                         <tr>
                             <td className="eiCell" style={{
@@ -55,6 +57,9 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 textOverflow: "clip",
                             }}>
                                 {ei}
+                            </td>
+                            <td>
+                                {eiHash}
                             </td>
                             <td>
                                 <input type="checkbox" disabled={true} checked={used} />
@@ -130,9 +135,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     availableLoadFiles: string[] | undefined;
 
     oninit() {
-        this.getGenOutput(),
-        this.getEi(),
-        this.getLoadFiles()
+        this.getGenOutput();
+        this.getEi();
+        this.getLoadFiles();
     }
 
     getEi() {
@@ -142,7 +147,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         })
             .then((arr: EiWithData[]) => {
                 this.eiTableData = [];
-                for (let {ei, stackTrace, choice, used} of arr) {
+                for (let {ei, eiHash, stackTrace, choice, used} of arr) {
                     const targetClass = "JavaScriptCodeGenerator";
                     let filteredStackTrace: StackTraceLine[] =
                         // stackTrace;
@@ -156,6 +161,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     }
                     this.eiTableData.push({
                         ei: eiString,
+                        eiHash,
                         choice,
                         stackTrace: filteredStackTrace,
                         used,
@@ -163,7 +169,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 }
             })
             .catch(e => {
-                this.eiTableData = [{ei: "ERROR " + e.message, choice: 0, stackTrace: [], used: false}]
+                this.eiTableData = [{ei: "ERROR " + e.message, eiHash: "", choice: 0, stackTrace: [], used: false}]
             });
     }
 
