@@ -41,7 +41,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      * Outside a repro run, this should be null. Moving the original map to here instead of making this the repro map
      * and performing a null check hopefully saves cycles, although maybe the JIT would've saved them anyway.
      */
-    var reproBackupEiMap: LinkedHashMap<ExecutionIndex, EiData>? = null
+    private var reproBackupEiMap: LinkedHashMap<ExecutionIndex, EiData>? = null
 
     /**
      * A stream of integers that will be consumed to fill values in the EI map.

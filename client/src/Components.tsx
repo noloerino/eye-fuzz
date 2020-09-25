@@ -43,7 +43,8 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <th scope="col">Hash</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
-                    <th scope="col">Old Value</th>
+                    {/*<th scope="col">Previous Value</th>*/}
+                    <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
                 </tr>
                 </thead>
@@ -73,6 +74,9 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                             }}>
                                 {stackTrace.map(serializeStackTraceLine).join("\n")}
                             </td>
+                            {/*<td style={{textAlign: "center"}}>*/}
+                            {/*    <span>TODO</span>*/}
+                            {/*</td>*/}
                             <td style={{textAlign: "center"}}>
                                 <span>{choice}</span>
                             </td>
@@ -99,34 +103,52 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
 }
 
 interface GenOutputDisplayAttrs {
-    genOutput: string
+    currOutput: string;
+    prevOutput: string;
 }
+
+const GEN_CELL_STYLE = {
+    maxHeight: "20em",
+    maxWidth: "30em",
+    overflow: "scroll",
+    whiteSpace: "nowrap",
+    fontSize: 14,
+    fontFamily: '"PT Mono", "Courier"'
+};
 
 class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
     view(vnode: Vnode<GenOutputDisplayAttrs, this>) {
         return (
-            <table>
-                <thead>
-                <tr>
-                    {/* TODO show fields instead? */}
-                    <th scope="col">Generator Serialized Output</th>
-                </tr>
-                </thead>
-                <tbody id="generatorTableBody">
-                <tr>
-                    <td id="genContentCell" style={{
-                        maxHeight: "20em",
-                        maxWidth: "30em",
-                        overflow: "scroll",
-                        whiteSpace: "nowrap",
-                        fontSize: 14,
-                        fontFamily: '"PT Mono", "Courier"'
-                    }}>
-                        {vnode.attrs.genOutput}
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <>
+                <table>
+                    <thead>
+                    <tr>
+                        <th scope="col">Current Generator Output</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td style={GEN_CELL_STYLE}>
+                            {vnode.attrs.currOutput}
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <table>
+                    <thead>
+                    <tr>
+                        <th scope="col">Previous Generator Output</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td style={GEN_CELL_STYLE}>
+                            {vnode.attrs.prevOutput}
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </>
         );
     }
 }
@@ -327,11 +349,13 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     <tbody>
                     <tr>
                         <td>
-                            <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData} newEiChoices={this.newEiChoices}
+                            <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData}
+                                                   newEiChoices={this.newEiChoices}
                                                    showUnused={this.showUnused}/>
                         </td>
                         <td>
-                            <GenOutputDisplay genOutput={this.currRunInfo.genOutput}/>
+                            <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
+                                              prevOutput={this.prevRunInfo.genOutput}/>
                         </td>
                     </tr>
                     </tbody>
