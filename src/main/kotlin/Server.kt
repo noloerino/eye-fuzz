@@ -95,7 +95,7 @@ object Server {
             } finally {
                 lock.unlock()
             }
-            log("Acknowledged completion work request for $this on thread ${Thread.currentThread()}")
+            log("Acknowledged completion of work request for $this on thread ${Thread.currentThread()}")
         }
 
         companion object {
@@ -183,6 +183,17 @@ object Server {
                     val key = e.ei
                     genGuidance.eiMap[key]!!.choice = e.choice
                 }
+                return "OK"
+            }
+        })
+        server.createContext("/reset", object : ResponseHandler("reset") {
+            /**
+             * Nukes the fuzzing session and starts afresh.
+             */
+            override fun onPost(reader: BufferedReader): String {
+                println("Clearing EI map and restarting...")
+                genGuidance.eiMap.clear()
+                MainThreadTask.RERUN_GENERATOR.requestWork()
                 return "OK"
             }
         })

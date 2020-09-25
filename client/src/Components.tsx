@@ -244,6 +244,20 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     }>
                         Rerun generator
                     </button>
+                    <br />
+                    <button type="submit" onclick={() =>{
+                        m.request({
+                            method: "POST",
+                            url: SERVER_URL + "/reset",
+                        })
+                            .then(() => console.log("Cleared existing EI"))
+                            .then(() => {
+                                this.getGenOutput();
+                                this.getEi();
+                            });
+                    }}>
+                        Restart from scratch
+                    </button>
                     <form id="saveForm" method="POST" onsubmit={(e: Event) => {
                         let saveFileName = this.saveFileName;
                         e.preventDefault();
