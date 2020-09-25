@@ -12,6 +12,7 @@ import java.io.File
 import java.io.InputStream
 import java.util.*
 import java.util.function.Consumer
+import kotlin.collections.LinkedHashMap
 
 /**
  * Analogous to a ExecutionIndexGuidance, but is backed by the above eiMap.
@@ -34,6 +35,15 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     var eiMap = linkedMapOf<ExecutionIndex, EiData>()
 
     /**
+     * During a repro run, the original EI map is saved here. Any values that did not appear in the repro EI run
+     * are thereby preserved for diffing purposes.
+     *
+     * Outside a repro run, this should be null. Moving the original map to here instead of making this the repro map
+     * and performing a null check hopefully saves cycles, although maybe the JIT would've saved them anyway.
+     */
+    var reproBackupEiMap: LinkedHashMap<ExecutionIndex, EiData>? = null
+
+    /**
      * A stream of integers that will be consumed to fill values in the EI map.
      * Should be null when not performing repro runs.
      */
@@ -50,9 +60,14 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      */
     fun reproWithFile(file: File): Closeable {
         this.reset()
-        eiMap.clear()
+        reproBackupEiMap = eiMap
+        eiMap = linkedMapOf()
         reproValues = file.readBytes().asSequence().map { it.toInt() and 0xFF }.iterator()
         return Closeable {
+            // Careful with ordering here - we want the new EI map to override the values in the backed up map
+            reproBackupEiMap!!.putAll(eiMap)
+            eiMap = reproBackupEiMap!!
+            reproBackupEiMap = null
             reproValues = null
         }
     }
