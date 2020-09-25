@@ -131,52 +131,23 @@ class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
     }
 }
 
+interface RunInfo {
+    eiTableData: EiWithData[];
+    genOutput: string;
+}
+
 export class RootTable extends MithrilTsxComponent<{ }> {
-    eiTableData: EiWithData[] = [];
+    currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
+    prevRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
-    genOutput: string = "";
     showUnused: boolean = true;
     saveFileName: string | undefined;
     loadFileName: string | undefined;
     availableLoadFiles: string[] | undefined;
 
     oninit() {
-        this.getGenOutput();
-        this.getEi();
+        this.getEiAndGenOutput();
         this.getLoadFiles();
-    }
-
-    getEi() {
-        m.request({
-            method: "GET",
-            url: SERVER_URL + "/ei",
-        })
-            .then((arr: EiWithData[]) => {
-                this.eiTableData = [];
-                for (let {ei, eiHash, stackTrace, choice, used} of arr) {
-                    const targetClass = "JavaScriptCodeGenerator";
-                    let filteredStackTrace: StackTraceLine[] =
-                        // stackTrace;
-                        stackTrace.filter((l: StackTraceLine) =>
-                            (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
-                        );
-                    let eiString = "";
-                    for (let i = 0; i < ei.length; i += 2) {
-                        eiString += ei[i] + " (" + ei[i + 1] + ")\n"
-                    }
-                    this.eiTableData.push({
-                        ei: eiString,
-                        eiHash,
-                        choice,
-                        stackTrace: filteredStackTrace,
-                        used,
-                    });
-                }
-            })
-            .catch(e => {
-                this.eiTableData = [{ei: "ERROR " + e.message, eiHash: "", choice: 0, stackTrace: [], used: false}]
-            });
     }
 
     // Returns a promise to allow us to await on the result on this request
@@ -184,7 +155,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         let arr = Array.from(this.newEiChoices.entries()).map(([i, choice]) => ({
             ei: JSON.parse(
                 "[" + (
-                    this.eiTableData[i].ei.replace(/[()]/g, "")
+                    this.currRunInfo.eiTableData[i].ei.replace(/[()]/g, "")
                         .replace(/\n/g, " ")
                         .trim()
                         .replace(/ /g, ",")
@@ -199,28 +170,68 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         });
     }
 
-
-    getGenOutput() {
-        // Mithril type defs don't yet have responseType, but excluding will cause it to just try and fail to read JSON
-        // @ts-ignore
-        m.request({
-            method: "GET",
+    postGenOutput(): Promise<void> {
+        return m.request({
+            method: "POST",
             url: SERVER_URL + "/generator",
-            responseType: "text",
-        })
-            .then((responseText: any) => {
-                this.genOutput = responseText;
-            });
+        });
+            // .then(() => this.getGenOutput());
             // .catch(e => this.genOutput = "ERROR " + e);
     }
 
-    postGenOutput() {
-        m.request({
-            method: "POST",
-            url: SERVER_URL + "/generator",
-        })
-            .then(() => this.getGenOutput());
-            // .catch(e => this.genOutput = "ERROR " + e);
+    /**
+     * Performs requests to get the EI and generator output, and also updates the curr/prev run info objects.
+     */
+    getEiAndGenOutput() {
+        Promise.all([
+            // Get generator output
+            // Mithril type defs don't yet have responseType, but excluding will cause it to just try and fail to read JSON
+            // @ts-ignore
+            m.request({
+                method: "GET",
+                url: SERVER_URL + "/generator",
+                responseType: "text",
+            })
+                // Needed to type check for now
+                .then((responseText: string) => responseText),
+            // Get new EI
+            m.request({
+                method: "GET",
+                url: SERVER_URL + "/ei",
+            })
+                .then((arr: EiWithData[]) =>
+                    arr.map(({ei, eiHash, stackTrace, choice, used}) => {
+                            const targetClass = "JavaScriptCodeGenerator";
+                            let filteredStackTrace: StackTraceLine[] =
+                                // stackTrace;
+                                stackTrace.filter((l: StackTraceLine) =>
+                                    (l.callLocation.containingClass.indexOf(targetClass) >= 0)
+                                    || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                                );
+                            let eiString = "";
+                            for (let i = 0; i < ei.length; i += 2) {
+                                eiString += ei[i] + " (" + ei[i + 1] + ")\n"
+                            }
+                            return {
+                                ei: eiString,
+                                eiHash,
+                                choice,
+                                stackTrace: filteredStackTrace,
+                                used,
+                            };
+                        }
+                    ))
+                .catch(e =>
+                    [{ei: "ERROR " + e.message, eiHash: "", choice: 0, stackTrace: [], used: false}]
+                )
+        ])
+            .then(([genOutput, eiData]) => {
+                this.prevRunInfo = this.currRunInfo;
+                this.currRunInfo = {
+                    eiTableData: eiData,
+                    genOutput,
+                }
+            });
     }
 
     getLoadFiles() {
@@ -240,7 +251,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     <button type="submit" onclick={() =>
                         this.updateEi()
                             .then(() => this.postGenOutput())
-                            .then(() => this.getEi())
+                            .then(() => this.getEiAndGenOutput())
                     }>
                         Rerun generator
                     </button>
@@ -251,10 +262,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             url: SERVER_URL + "/reset",
                         })
                             .then(() => console.log("Cleared existing EI"))
-                            .then(() => {
-                                this.getGenOutput();
-                                this.getEi();
-                            });
+                            .then(() => this.getEiAndGenOutput());
                     }}>
                         Restart from scratch
                     </button>
@@ -287,8 +295,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 body: {fileName: loadFileName},
                             })
                                 .then(() => console.log("Loaded file", loadFileName))
-                                .then(() => Promise.all([this.getEi(), this.getGenOutput()]))
-                            ;
+                                .then(() => this.getEiAndGenOutput());
                             this.loadFileName = undefined;
                         }
                     }}>
@@ -320,11 +327,11 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     <tbody>
                     <tr>
                         <td>
-                            <ExecutionIndexDisplay eiTableData={this.eiTableData} newEiChoices={this.newEiChoices}
+                            <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData} newEiChoices={this.newEiChoices}
                                                    showUnused={this.showUnused}/>
                         </td>
                         <td>
-                            <GenOutputDisplay genOutput={this.genOutput}/>
+                            <GenOutputDisplay genOutput={this.currRunInfo.genOutput}/>
                         </td>
                     </tr>
                     </tbody>
