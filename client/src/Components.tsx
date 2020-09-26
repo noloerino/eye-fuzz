@@ -5,6 +5,7 @@ const SERVER_URL = "http://localhost:8000";
 
 interface ExecutionIndexDisplayAttrs {
     eiTableData: EiWithData[];
+    prevEiChoices: Map<ExecutionIndex, number>;
     newEiChoices: Map<number, number>;
     showUnused: boolean;
 }
@@ -25,8 +26,10 @@ function serializeStackTraceLine(l: StackTraceLine): string {
     return `(${l.count}) ${cl.containingClass}#${cl.containingMethodName}()@${cl.lineNumber} --> ${cl.invokedMethodName}`;
 }
 
+type ExecutionIndex = string;
+
 interface EiWithData {
-    ei: string;
+    ei: ExecutionIndex;
     eiHash: string;
     choice: number;
     stackTrace: StackTraceLine[];
@@ -43,7 +46,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <th scope="col">Hash</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
-                    {/*<th scope="col">Previous Value</th>*/}
+                    <th scope="col">Previous Value</th>
                     <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
                 </tr>
@@ -74,9 +77,9 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                             }}>
                                 {stackTrace.map(serializeStackTraceLine).join("\n")}
                             </td>
-                            {/*<td style={{textAlign: "center"}}>*/}
-                            {/*    <span>TODO</span>*/}
-                            {/*</td>*/}
+                            <td style={{textAlign: "center"}}>
+                                <span>{vnode.attrs.prevEiChoices.get(ei) ?? "--"}</span>
+                            </td>
                             <td style={{textAlign: "center"}}>
                                 <span>{choice}</span>
                             </td>
@@ -158,9 +161,14 @@ interface RunInfo {
     genOutput: string;
 }
 
+interface OldRunInfo {
+    oldEiChoices: Map<ExecutionIndex, number>;
+    genOutput: string;
+}
+
 export class RootTable extends MithrilTsxComponent<{ }> {
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
-    prevRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
+    prevRunInfo: OldRunInfo = {oldEiChoices: new Map(), genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
     showUnused: boolean = true;
     saveFileName: string | undefined;
@@ -248,7 +256,14 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 )
         ])
             .then(([genOutput, eiData]) => {
-                this.prevRunInfo = this.currRunInfo;
+                let oldEiChoices = new Map();
+                for (let {ei, choice} of this.currRunInfo.eiTableData) {
+                    oldEiChoices.set(ei, choice);
+                }
+                this.prevRunInfo = {
+                    oldEiChoices,
+                    genOutput: this.currRunInfo.genOutput,
+                };
                 this.currRunInfo = {
                     eiTableData: eiData,
                     genOutput,
@@ -351,6 +366,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         <td>
                             <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData}
                                                    newEiChoices={this.newEiChoices}
+                                                   prevEiChoices={this.prevRunInfo.oldEiChoices}
                                                    showUnused={this.showUnused}/>
                         </td>
                         <td>
