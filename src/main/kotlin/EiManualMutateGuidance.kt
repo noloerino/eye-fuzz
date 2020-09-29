@@ -177,7 +177,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
 
     fun writeSessionHistoryToFile(dest: File) {
         val data = fuzzState.history
-        dest.writeText(Json.encodeToString(data))
+        dest.writeText(Json { prettyPrint = true }.encodeToString(data))
     }
 
     companion object {
