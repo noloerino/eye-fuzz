@@ -182,7 +182,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     }
 
     fun loadSessionHistory(src: File) {
-        val newHistory: List<EiDiff> = Json.decodeFromString(src.readText());
+        val newHistory: List<List<EiDiff>> = Json.decodeFromString(src.readText())
         fuzzState.reloadFromDiffs(newHistory)
     }
 

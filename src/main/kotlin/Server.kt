@@ -194,7 +194,6 @@ object Server {
         System.setProperty("jqf.traceGenerators", "true")
         // Needed for some jank call tracking
         dummy()
-        println("Initial map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
     /**

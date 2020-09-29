@@ -13,25 +13,35 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     var eiMap = linkedMapOf<ExecutionIndex, EiData>()
     val mapSize get() = eiMap.size
 
-    private val diffs = mutableListOf<EiDiff>()
+    /**
+     * Each element in the list contains the sequence of diffs incurred over the course of a single generator run.
+     * The last element of the list represents the most recent set of changes.
+     */
+    private val diffStack = mutableListOf<MutableList<EiDiff>>()
+    // resetForNewRun() must be called first, or else this will throw an exception
+    private val diffs: MutableList<EiDiff> get() = diffStack.last()
     // hides mutability of diffs
-    val history: List<EiDiff> get() = diffs
+    val history: List<List<EiDiff>> get() = diffStack
 
     fun resetForNewRun() {
         usedThisRun.clear()
+        diffStack.add(mutableListOf())
     }
 
     fun clear() {
         eiMap.clear()
         usedThisRun.clear()
-        diffs.clear()
+        diffStack.clear()
     }
 
-    fun reloadFromDiffs(newDiffs: List<EiDiff>) {
+    fun reloadFromDiffs(newDiffStack: List<List<EiDiff>>) {
         clear()
-        newDiffs.forEach {
-            diffs.add(it)
-            it.apply(this)
+        newDiffStack.forEach { lst ->
+            diffStack.add(lst.toMutableList())
+            lst.forEach {
+                diffs.add(it)
+                it.apply(this)
+            }
         }
     }
 
@@ -65,9 +75,6 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
 @Serializable
 sealed class EiDiff {
     @Serializable
-    object ClearAllUsed : EiDiff()
-
-    @Serializable
     class MarkUsed(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex) : EiDiff()
 
     @Serializable
@@ -79,7 +86,6 @@ sealed class EiDiff {
 
     fun apply(state: FuzzState) {
         when (this) {
-            is ClearAllUsed -> state.usedThisRun.clear()
             is MarkUsed -> state.usedThisRun.add(ei)
             is UpdateChoice -> state.eiMap.replace(ei, EiData(state.eiMap[ei]!!.stackTrace, new))
             is Create -> state.eiMap[ei] = EiData(stackTrace, choice)
