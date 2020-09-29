@@ -27,6 +27,14 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         diffs.clear()
     }
 
+    fun reloadFromDiffs(newDiffs: List<EiDiff>) {
+        clear()
+        newDiffs.forEach {
+            diffs.add(it)
+            it.apply(this)
+        }
+    }
+
     /**
      * Adds the EI to the map if not present, and returns the choice made at this EI.
      */

@@ -174,11 +174,14 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     saveFileName: string | undefined;
     loadFileName: string | undefined;
     saveSessionName: string | undefined;
+    loadSessionName: string | undefined;
     availableLoadFiles: string[] | undefined;
+    availableLoadSessions: string[] | undefined;
 
     oninit() {
         this.getEiAndGenOutput();
         this.getLoadFiles();
+        this.getLoadSessions();
     }
 
     // Returns a promise to allow us to await on the result on this request
@@ -282,6 +285,16 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             });
     }
 
+    getLoadSessions() {
+        m.request({
+            method: "GET",
+            url: SERVER_URL + "/load_session",
+        })
+            .then((files: string[]) => {
+                this.availableLoadSessions = files;
+            });
+    }
+
     view() {
         return (
             <div>
@@ -335,7 +348,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                     body: {fileName: loadFileName},
                                 })
                                     .then(() => console.log("Loaded file", loadFileName))
-                                    .then(() => this.getEiAndGenOutput());
+                                    .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
                                 this.loadFileName = undefined;
                             }
                         }}>
@@ -373,6 +386,34 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 }/>
                             </label>
                             <button type="submit">Save</button>
+                        </form>
+                        <form id="loadSessionForm" method="POST" onsubmit={(e: Event) => {
+                            let loadFileName = this.loadSessionName;
+                            e.preventDefault();
+                            if (loadFileName) {
+                                m.request({
+                                    method: "POST",
+                                    url: SERVER_URL + "/load_session",
+                                    body: {fileName: loadFileName},
+                                })
+                                    .then(() => console.log("Loaded session", loadFileName))
+                                    .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
+                                this.loadSessionName = undefined;
+                            }
+                        }}>
+                            <label>
+                                Load session from file:{" "}
+                                <select value={this.loadSessionName} onchange={(e: Event) => {
+                                    this.loadSessionName = (e.target!! as HTMLSelectElement).value;
+                                }}>
+                                    <option value=""/>
+                                    {
+                                        this.availableLoadSessions?.map((fileName: string) =>
+                                            <option value={fileName}>{fileName}</option>)
+                                    }
+                                </select>
+                            </label>
+                            <button type="submit">Load</button>
                         </form>
                     </div>
 

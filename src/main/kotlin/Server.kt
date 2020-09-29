@@ -180,15 +180,8 @@ object Server {
         server.createContext("/save_input", SaveInputHandler())
         server.createContext("/load_input", LoadInputHandler())
         server.createContext("/save_session", SaveSessionHandler())
-//        server.createContext("/coverage",
-//                object : ResponseHandler("coverage") {
-//                    override fun onGet(): String {
-//                        return ""
-//                    }
-//                }
-//        )
-        val genHandler = GenHandler("generator")
-        server.createContext("/generator", genHandler)
+        server.createContext("/load_session", LoadSessionHandler())
+        server.createContext("/generator", GenHandler())
         server.start()
         println("Server initialized at port " + server.address.port)
         while (true) {
@@ -268,7 +261,7 @@ object Server {
         }
     }
 
-    private class GenHandler(name: String?) : ResponseHandler(name) {
+    private class GenHandler : ResponseHandler("generator") {
         override fun onGet(): String {
             return getGenContents()
         }
@@ -297,7 +290,7 @@ object Server {
             val saveRequest = Json.decodeFromString<SaveRequest>(text)
             val saveFile = resolveInputFile(saveRequest.fileName)
             println("Saving last run to ${saveFile.canonicalPath}")
-            genGuidance.writeLastRunToFile(saveFile)
+            genGuidance.writeLastRun(saveFile)
             return "OK"
         }
     }
@@ -321,7 +314,7 @@ object Server {
             val loadRequest = Json.decodeFromString<LoadRequest>(text)
             // TODO handle error case i guess
             val loadFile = resolveInputFile(loadRequest.fileName)
-            println("Loading run from last run from ${loadFile.canonicalPath}")
+            println("Loading run from ${loadFile.canonicalPath}")
             genGuidance.reproWithFile(loadFile).use {
                 MainThreadTask.LOAD_FROM_FILE.requestWork()
             }
@@ -345,7 +338,35 @@ object Server {
             val saveRequest = Json.decodeFromString<SaveRequest>(text)
             val saveFile = resolveSessionFile(saveRequest.fileName)
             println("Saving session history to ${saveFile.canonicalPath}")
-            genGuidance.writeSessionHistoryToFile(saveFile)
+            genGuidance.writeSessionHistory(saveFile)
+            return "OK"
+        }
+    }
+
+    private class LoadSessionHandler : ResponseHandler("load_session") {
+        @Serializable
+        private data class LoadRequest(val fileName: String)
+
+        /**
+         * Returns a list of all saved sessions available to load.
+         */
+        override fun onGet(): String {
+            return Json.encodeToString<List<String>>(saveSessionDir.list()!!.toList())
+        }
+
+        /**
+         * Replaces the current fuzzing state with the history stored in the given file and reruns the generator
+         * once the state is restored.
+         *
+         * Nukes the existing state before the load occurs.
+         */
+        override fun onPost(reader: BufferedReader): String {
+            val text = reader.readText()
+            val loadRequest = Json.decodeFromString<LoadRequest>(text)
+            val loadFile = resolveSessionFile(loadRequest.fileName)
+            println("Loading session history from ${loadFile.canonicalPath}")
+            genGuidance.loadSessionHistory(loadFile)
+            MainThreadTask.RERUN_GENERATOR.requestWork()
             return "OK"
         }
     }

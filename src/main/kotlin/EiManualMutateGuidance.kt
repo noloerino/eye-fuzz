@@ -7,6 +7,7 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.Closeable
@@ -171,13 +172,18 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
         return fuzzState.usedThisRun.map { k -> fuzzState.eiMap[k]!!.choice.toByte() }.toByteArray()
     }
 
-    fun writeLastRunToFile(dest: File) {
+    fun writeLastRun(dest: File) {
         dest.writeBytes(getLastRunBytes())
     }
 
-    fun writeSessionHistoryToFile(dest: File) {
+    fun writeSessionHistory(dest: File) {
         val data = fuzzState.history
         dest.writeText(Json { prettyPrint = true }.encodeToString(data))
+    }
+
+    fun loadSessionHistory(src: File) {
+        val newHistory: List<EiDiff> = Json.decodeFromString(src.readText());
+        fuzzState.reloadFromDiffs(newHistory)
     }
 
     companion object {
