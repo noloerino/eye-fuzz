@@ -197,8 +197,8 @@ object Server {
                 return "OK"
             }
         })
-        server.createContext("/save", SaveHandler())
-        server.createContext("/load", LoadHandler())
+        server.createContext("/save_input", SaveHandler())
+        server.createContext("/load_input", LoadHandler())
 //        server.createContext("/coverage",
 //                object : ResponseHandler("coverage") {
 //                    override fun onGet(): String {
@@ -305,16 +305,16 @@ object Server {
         }
     }
 
-    val saveDir = File("savedInputs")
+    val saveInputDir = File("savedInputs")
     init {
-        assert(saveDir.mkdirs()) { "Unable to create saved input directory at $saveDir" }
+        assert(saveInputDir.mkdirs()) { "Unable to create saved input directory at $saveInputDir" }
     }
 
     private fun resolveSaveFile(fileName: String): File {
-        return saveDir.toPath().resolve(fileName).toFile()
+        return saveInputDir.toPath().resolve(fileName).toFile()
     }
 
-    private class SaveHandler : ResponseHandler("save") {
+    private class SaveHandler : ResponseHandler("save_input") {
         @Serializable
         data class SaveRequest(val fileName: String)
 
@@ -329,7 +329,7 @@ object Server {
         }
     }
 
-    private class LoadHandler : ResponseHandler("load") {
+    private class LoadHandler : ResponseHandler("load_input") {
         @Serializable
         data class LoadRequest(val fileName: String)
 
@@ -337,7 +337,7 @@ object Server {
          * Returns a list of all saved inputs available for repro.
          */
         override fun onGet(): String {
-            return Json.encodeToString<List<String>>(saveDir.list()!!.toList())
+            return Json.encodeToString<List<String>>(saveInputDir.list()!!.toList())
         }
 
         /**

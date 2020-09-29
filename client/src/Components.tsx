@@ -274,7 +274,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     getLoadFiles() {
         m.request({
             method: "GET",
-            url: SERVER_URL + "/load",
+            url: SERVER_URL + "/load_input",
         })
             .then((files: string[]) => {
                 this.availableLoadFiles = files;
@@ -308,7 +308,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         e.preventDefault();
                         m.request({
                             method: "POST",
-                            url: SERVER_URL + "/save",
+                            url: SERVER_URL + "/save_input",
                             body: {fileName: saveFileName},
                         }).then(() => console.log("Saved file", saveFileName, "(probably)"));
                         this.saveFileName = undefined;
@@ -328,7 +328,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         if (loadFileName) {
                             m.request({
                                 method: "POST",
-                                url: SERVER_URL + "/load",
+                                url: SERVER_URL + "/load_input",
                                 body: {fileName: loadFileName},
                             })
                                 .then(() => console.log("Loaded file", loadFileName))
