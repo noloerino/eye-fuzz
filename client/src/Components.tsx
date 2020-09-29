@@ -173,6 +173,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     showUnused: boolean = true;
     saveFileName: string | undefined;
     loadFileName: string | undefined;
+    saveSessionName: string | undefined;
     availableLoadFiles: string[] | undefined;
 
     oninit() {
@@ -303,54 +304,78 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     }}>
                         Restart from scratch
                     </button>
-                    <form id="saveForm" method="POST" onsubmit={(e: Event) => {
-                        let saveFileName = this.saveFileName;
-                        e.preventDefault();
-                        m.request({
-                            method: "POST",
-                            url: SERVER_URL + "/save_input",
-                            body: {fileName: saveFileName},
-                        }).then(() => console.log("Saved file", saveFileName, "(probably)"));
-                        this.saveFileName = undefined;
-                    }}>
-                        <label>
-                            Save last input to file:{" "}
-                            <input type="text" value={this.saveFileName} required oninput={(e: InputEvent) =>
-                                this.saveFileName = (e.target!! as HTMLInputElement).value
-                            }/>
-                        </label>
-                        {/* TODO add feedback for save success/fail */}
-                        <button type="submit">Save</button>
-                    </form>
-                    <form id="loadForm" method="POST" onsubmit={(e: Event) => {
-                        let loadFileName = this.loadFileName;
-                        e.preventDefault();
-                        if (loadFileName) {
+
+                    <div>
+                        <form id="saveInputForm" onsubmit={(e: Event) => {
+                            let saveFileName = this.saveFileName;
+                            e.preventDefault();
                             m.request({
                                 method: "POST",
-                                url: SERVER_URL + "/load_input",
-                                body: {fileName: loadFileName},
-                            })
-                                .then(() => console.log("Loaded file", loadFileName))
-                                .then(() => this.getEiAndGenOutput());
-                            this.loadFileName = undefined;
-                        }
-                    }}>
-                        <label>
-                            Load input file:{" "}
-                            <select value={this.loadFileName} onchange={(e: Event) => {
-                                this.loadFileName = (e.target!! as HTMLSelectElement).value;
-                            }}>
-                                <option value=""/>
-                                {
-                                    this.availableLoadFiles?.map((fileName: string) =>
-                                        <option value={fileName}>{fileName}</option>)
-                                }
-                            </select>
-                        </label>
-                        {/* TODO add feedback for save success/fail */}
-                        <button type="submit">Load</button>
-                    </form>
+                                url: SERVER_URL + "/save_input",
+                                body: {fileName: saveFileName},
+                            }).then(() => console.log("Saved file", saveFileName, "(probably)"));
+                            this.saveFileName = undefined;
+                        }}>
+                            <label>
+                                Save last input to file:{" "}
+                                <input type="text" value={this.saveFileName} required oninput={(e: InputEvent) =>
+                                    this.saveFileName = (e.target!! as HTMLInputElement).value
+                                }/>
+                            </label>
+                            {/* TODO add feedback for save success/fail */}
+                            <button type="submit">Save</button>
+                        </form>
+                        <form id="loadInputForm" method="POST" onsubmit={(e: Event) => {
+                            let loadFileName = this.loadFileName;
+                            e.preventDefault();
+                            if (loadFileName) {
+                                m.request({
+                                    method: "POST",
+                                    url: SERVER_URL + "/load_input",
+                                    body: {fileName: loadFileName},
+                                })
+                                    .then(() => console.log("Loaded file", loadFileName))
+                                    .then(() => this.getEiAndGenOutput());
+                                this.loadFileName = undefined;
+                            }
+                        }}>
+                            <label>
+                                Load input file:{" "}
+                                <select value={this.loadFileName} onchange={(e: Event) => {
+                                    this.loadFileName = (e.target!! as HTMLSelectElement).value;
+                                }}>
+                                    <option value=""/>
+                                    {
+                                        this.availableLoadFiles?.map((fileName: string) =>
+                                            <option value={fileName}>{fileName}</option>)
+                                    }
+                                </select>
+                            </label>
+                            <button type="submit">Load</button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <form id="saveSessionForm" onsubmit={(e: Event) => {
+                            let saveFileName = this.saveSessionName;
+                            e.preventDefault();
+                            m.request({
+                                method: "POST",
+                                url: SERVER_URL + "/save_session",
+                                body: {fileName: saveFileName},
+                            }).then(() => console.log("Saved session", saveFileName, "(probably)"));
+                            this.saveSessionName = undefined;
+                        }}>
+                            <label>
+                                Save current session to file:{" "}
+                                <input type="text" value={this.saveSessionName} required oninput={(e: InputEvent) =>
+                                    this.saveSessionName = (e.target!! as HTMLInputElement).value
+                                }/>
+                            </label>
+                            <button type="submit">Save</button>
+                        </form>
+                    </div>
+
                     <label>
                         <input type="checkbox" id="showUnused" checked={this.showUnused}
                                oninput={(e: Event) => {

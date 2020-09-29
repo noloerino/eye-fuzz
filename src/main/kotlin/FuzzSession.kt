@@ -2,12 +2,6 @@ import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import kotlinx.serialization.Serializable
 import java.util.*
 
-/**
- * Represents the state of a fuzzing session as a sequence of changes from an empty initial state that was needed to
- * arrive at the final state.
- */
-data class FuzzSession(val history: List<EiDiff>)
-
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
     /**
      * Tracks which EIs were used in the most recent run of the generator.
@@ -19,7 +13,9 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     var eiMap = linkedMapOf<ExecutionIndex, EiData>()
     val mapSize get() = eiMap.size
 
-    val diffs = mutableListOf<EiDiff>()
+    private val diffs = mutableListOf<EiDiff>()
+    // hides mutability of diffs
+    val history: List<EiDiff> get() = diffs
 
     fun resetForNewRun() {
         usedThisRun.clear()

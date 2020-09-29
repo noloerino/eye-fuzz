@@ -3,7 +3,6 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
-import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
@@ -178,8 +177,9 @@ object Server {
                 return "OK"
             }
         })
-        server.createContext("/save_input", SaveHandler())
-        server.createContext("/load_input", LoadHandler())
+        server.createContext("/save_input", SaveInputHandler())
+        server.createContext("/load_input", LoadInputHandler())
+        server.createContext("/save_session", SaveSessionHandler())
 //        server.createContext("/coverage",
 //                object : ResponseHandler("coverage") {
 //                    override fun onGet(): String {
@@ -286,28 +286,25 @@ object Server {
         assert(saveInputDir.mkdirs()) { "Unable to create saved input directory at $saveInputDir" }
     }
 
-    private fun resolveSaveFile(fileName: String): File {
-        return saveInputDir.toPath().resolve(fileName).toFile()
-    }
+    private fun resolveInputFile(fileName: String): File = saveInputDir.toPath().resolve(fileName).toFile()
 
-    private class SaveHandler : ResponseHandler("save_input") {
+    private class SaveInputHandler : ResponseHandler("save_input") {
         @Serializable
-        data class SaveRequest(val fileName: String)
+        private data class SaveRequest(val fileName: String)
 
         override fun onPost(reader: BufferedReader): String {
             val text = reader.readText()
             val saveRequest = Json.decodeFromString<SaveRequest>(text)
-            // just kinda assume the file exists I guess...
-            val saveFile = resolveSaveFile(saveRequest.fileName)
+            val saveFile = resolveInputFile(saveRequest.fileName)
             println("Saving last run to ${saveFile.canonicalPath}")
             genGuidance.writeLastRunToFile(saveFile)
             return "OK"
         }
     }
 
-    private class LoadHandler : ResponseHandler("load_input") {
+    private class LoadInputHandler : ResponseHandler("load_input") {
         @Serializable
-        data class LoadRequest(val fileName: String)
+        private data class LoadRequest(val fileName: String)
 
         /**
          * Returns a list of all saved inputs available for repro.
@@ -323,11 +320,32 @@ object Server {
             val text = reader.readText()
             val loadRequest = Json.decodeFromString<LoadRequest>(text)
             // TODO handle error case i guess
-            val loadFile = resolveSaveFile(loadRequest.fileName)
+            val loadFile = resolveInputFile(loadRequest.fileName)
             println("Loading run from last run from ${loadFile.canonicalPath}")
             genGuidance.reproWithFile(loadFile).use {
                 MainThreadTask.LOAD_FROM_FILE.requestWork()
             }
+            return "OK"
+        }
+    }
+
+    private val saveSessionDir = File("savedSessions")
+    init {
+        assert(saveSessionDir.mkdirs()) { "Unable to create saved session directory at $saveSessionDir" }
+    }
+
+    private fun resolveSessionFile(fileName: String): File = saveSessionDir.toPath().resolve(fileName).toFile()
+
+    private class SaveSessionHandler : ResponseHandler("save_session") {
+        @Serializable
+        private data class SaveRequest(val fileName: String)
+
+        override fun onPost(reader: BufferedReader): String {
+            val text = reader.readText()
+            val saveRequest = Json.decodeFromString<SaveRequest>(text)
+            val saveFile = resolveSessionFile(saveRequest.fileName)
+            println("Saving session history to ${saveFile.canonicalPath}")
+            genGuidance.writeSessionHistoryToFile(saveFile)
             return "OK"
         }
     }

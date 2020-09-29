@@ -7,6 +7,8 @@ import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.io.File
 import java.io.InputStream
@@ -26,6 +28,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     private var hasRun = false
 
     val fuzzState = FuzzState(this, rng)
+    val history by ::fuzzState
 
     /**
      * During a repro run, the original EI map is saved here. Any values that did not appear in the repro EI run
@@ -170,6 +173,11 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
 
     fun writeLastRunToFile(dest: File) {
         dest.writeBytes(getLastRunBytes())
+    }
+
+    fun writeSessionHistoryToFile(dest: File) {
+        val data = fuzzState.history
+        dest.writeText(Json.encodeToString(data))
     }
 
     companion object {
