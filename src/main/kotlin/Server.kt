@@ -32,12 +32,6 @@ object Server {
     private val jsGen = JavaScriptCodeGenerator()
     private var genContents: String? = null
 
-    @JvmField
-    val eventStrings: MutableMap<Int, String> = mutableMapOf()
-
-    @JvmField
-    val callLocations: MutableMap<Int, CallLocation> = mutableMapOf()
-
     var mainThread: Thread? = null
 
     /**
@@ -229,37 +223,6 @@ object Server {
         println("generator produced: " + getGenContents())
     }
 
-    @JvmStatic
-    fun eventToString(e: TraceEvent): String {
-        return eventStrings.computeIfAbsent(e.iid) {
-            when (e) {
-                is BranchEvent -> {
-                    String.format("(branch) %s#%s()@%d [%d]", e.containingClass, e.containingMethodName,
-                            e.lineNumber, e.arm)
-                }
-                is CallEvent -> {
-                    callLocations.computeIfAbsent(e.iid) {
-                        CallLocation(e.iid, e.containingClass, e.containingMethodName, e.lineNumber, e.invokedMethodName)
-                    }
-                    String.format("(call) %s#%s()@%d --> %s", e.containingClass, e.containingMethodName,
-                            e.lineNumber, e.invokedMethodName)
-                }
-                is ReturnEvent -> {
-                    "(return) ${e.containingClass}#${e.containingMethodName}"
-                }
-                is AllocEvent -> {
-                    "(alloc) size ${e.size} ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
-                }
-                is ReadEvent -> {
-                    "(read) ${e.field} in ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
-                }
-                else -> {
-                    String.format("(other) %s#%s()@%d", e.containingClass, e.containingMethodName, e.lineNumber)
-                }
-            }
-        }
-    }
-
     private class GenHandler : ResponseHandler("generator") {
         override fun onGet(): String {
             return getGenContents()
@@ -366,6 +329,7 @@ object Server {
             println("Loading session history from ${loadFile.canonicalPath}")
             genGuidance.loadSessionHistory(loadFile)
             MainThreadTask.RERUN_GENERATOR.requestWork()
+//            return Json.encodeToString(genGuidance.fuzzState.history)
             return "OK"
         }
     }

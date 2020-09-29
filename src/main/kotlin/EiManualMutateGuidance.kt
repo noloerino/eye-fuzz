@@ -1,12 +1,9 @@
-import Server.eventToString
 import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
 import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
-import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent
-import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent
-import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
+import edu.berkeley.cs.jqf.instrument.tracing.events.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -82,7 +79,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     fun getFullStackTrace(): List<StackTraceLine> = (0 until eiState.depth + 1).map { i ->
         val iid = eiState.rollingIndex[2 * i]
         val count = eiState.rollingIndex[2 * i + 1]
-        val callLocation = Server.callLocations[iid]!!
+        val callLocation = callLocations[iid]!!
         StackTraceLine(callLocation, count)
     }
 
@@ -188,5 +185,43 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
 
     companion object {
         private const val verbose = false
+
+        @JvmField
+        val eventStrings: MutableMap<Int, String> = mutableMapOf()
+
+        @JvmField
+        val callLocations: MutableMap<Int, CallLocation> = mutableMapOf()
+
+        @JvmStatic
+        fun eventToString(e: TraceEvent): String {
+            return eventStrings.computeIfAbsent(e.iid) {
+                when (e) {
+                    is BranchEvent -> {
+                        String.format("(branch) %s#%s()@%d [%d]", e.containingClass, e.containingMethodName,
+                                e.lineNumber, e.arm)
+                    }
+                    is CallEvent -> {
+                        callLocations.computeIfAbsent(e.iid) {
+                            CallLocation(e.iid, e.containingClass, e.containingMethodName, e.lineNumber, e.invokedMethodName)
+                        }
+                        String.format("(call) %s#%s()@%d --> %s", e.containingClass, e.containingMethodName,
+                                e.lineNumber, e.invokedMethodName)
+                    }
+                    is ReturnEvent -> {
+                        "(return) ${e.containingClass}#${e.containingMethodName}"
+                    }
+                    is AllocEvent -> {
+                        "(alloc) size ${e.size} ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
+                    }
+                    is ReadEvent -> {
+                        "(read) ${e.field} in ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
+                    }
+                    else -> {
+                        String.format("(other) %s#%s()@%d", e.containingClass, e.containingMethodName, e.lineNumber)
+                    }
+                }
+            }
+        }
+
     }
 }

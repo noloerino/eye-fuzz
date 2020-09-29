@@ -2,6 +2,8 @@ import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import kotlinx.serialization.Serializable
 import java.util.*
 
+typealias FuzzHistory = List<List<EiDiff>>
+
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
     /**
      * Tracks which EIs were used in the most recent run of the generator.
@@ -20,8 +22,9 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     private val diffStack = mutableListOf<MutableList<EiDiff>>()
     // resetForNewRun() must be called first, or else this will throw an exception
     private val diffs: MutableList<EiDiff> get() = diffStack.last()
+
     // hides mutability of diffs
-    val history: List<List<EiDiff>> get() = diffStack
+    val history: FuzzHistory get() = diffStack
 
     fun resetForNewRun() {
         usedThisRun.clear()
@@ -75,13 +78,13 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
 @Serializable
 sealed class EiDiff {
     @Serializable
-    class MarkUsed(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex) : EiDiff()
+    data class MarkUsed(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex) : EiDiff()
 
     @Serializable
-    class UpdateChoice(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
+    data class UpdateChoice(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
                        val new: Int) : EiDiff()
     @Serializable
-    class Create(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
+    data class Create(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
                  val stackTrace: StackTrace, val choice: Int) : EiDiff()
 
     fun apply(state: FuzzState) {
