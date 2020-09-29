@@ -151,26 +151,8 @@ object Server {
              * GET returns a list of all EIs in the map.
              */
             override fun onGet(): String {
-                val data = genGuidance.eiMap.map { (ei, value) ->
-                    EiWithData(ei, value.stackTrace, value.choice, ei in genGuidance.usedThisRun)
-                }
+                val data = genGuidance.fuzzState.snapshot()
                 return Json.encodeToString(data)
-            }
-
-            /**
-             * PATCH performs a full update to EIs, removing any EIs not included in this request.
-             */
-            override fun onPost(reader: BufferedReader): String {
-                val newEiMap = LinkedHashMap<ExecutionIndex, EiData>()
-                val text = reader.readText()
-                val arr = Json.decodeFromString<List<EiWithoutStackTrace>>(text)
-                for (e in arr) {
-                    val key = e.ei
-                    val choice = e.choice
-                    newEiMap[key] = EiData(genGuidance.eiMap[key]!!.stackTrace, choice)
-                }
-                genGuidance.eiMap = newEiMap
-                return "OK"
             }
 
             /**
@@ -180,8 +162,7 @@ object Server {
                 val text = reader.readText()
                 val arr = Json.decodeFromString<List<EiWithoutStackTrace>>(text)
                 for (e in arr) {
-                    val key = e.ei
-                    genGuidance.eiMap[key]!!.choice = e.choice
+                    genGuidance.fuzzState.update(e.ei, e.choice)
                 }
                 return "OK"
             }
@@ -192,7 +173,7 @@ object Server {
              */
             override fun onPost(reader: BufferedReader): String {
                 println("Clearing EI map and restarting...")
-                genGuidance.eiMap.clear()
+                genGuidance.fuzzState.clear()
                 MainThreadTask.RERUN_GENERATOR.requestWork()
                 return "OK"
             }
@@ -218,14 +199,9 @@ object Server {
     private fun init() {
         mainThread = Thread.currentThread()
         System.setProperty("jqf.traceGenerators", "true")
-//        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        //        String target = JavaScriptCodeGenerator.class.getName() + "#generate";
-//        val target = Server::class.java.name + "#dummy"
-//        SingleSnoop.startSnooping(target)
-//        println(SingleSnoop.entryPoints)
         // Needed for some jank call tracking
         dummy()
-        println("Initial map is of size " + genGuidance.eiMap.size)
+        println("Initial map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
     /**
@@ -239,7 +215,7 @@ object Server {
         SingleSnoop.startSnooping(target)
         genGuidance.reset()
         runGenerator()
-        println("Updated generator contents (map is of size " + genGuidance.eiMap.size + ")")
+        println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
     private fun getGenContents(): String {

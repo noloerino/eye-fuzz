@@ -19,20 +19,13 @@ import kotlin.collections.LinkedHashMap
  * Needs to record coverage for EI to work.
  * Run only once.
  */
-class EiManualMutateGuidance(private val rng: Random) : Guidance {
+class EiManualMutateGuidance(rng: Random) : Guidance {
     private var appThread: Thread? = null // Ensures only one thread
     private var lastEvent: TraceEvent? = null
     private var eiState = EiState()
     private var hasRun = false
 
-    /**
-     * Tracks which EIs were used in the most recent run of the generator.
-     *
-     * Since EIs are unique (as visiting the same location twice would result in an incremented count),
-     * we're able to use a LinkedSet instead of an ordinary list.
-     */
-    val usedThisRun = linkedSetOf<ExecutionIndex>()
-    var eiMap = linkedMapOf<ExecutionIndex, EiData>()
+    val fuzzState = FuzzState(this, rng)
 
     /**
      * During a repro run, the original EI map is saved here. Any values that did not appear in the repro EI run
@@ -47,7 +40,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      * A stream of integers that will be consumed to fill values in the EI map.
      * Should be null when not performing repro runs.
      */
-    private var reproValues: Iterator<Int>? = null
+    var reproValues: Iterator<Int>? = null
 
     val isInReproMode: Boolean get() = reproValues != null
 
@@ -60,13 +53,13 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      */
     fun reproWithFile(file: File): Closeable {
         this.reset()
-        reproBackupEiMap = eiMap
-        eiMap = linkedMapOf()
+        reproBackupEiMap = fuzzState.eiMap
+        fuzzState.eiMap = linkedMapOf()
         reproValues = file.readBytes().asSequence().map { it.toInt() and 0xFF }.iterator()
         return Closeable {
             // Careful with ordering here - we want the new EI map to override the values in the backed up map
-            reproBackupEiMap!!.putAll(eiMap)
-            eiMap = reproBackupEiMap!!
+            reproBackupEiMap!!.putAll(fuzzState.eiMap)
+            fuzzState.eiMap = reproBackupEiMap!!
             reproBackupEiMap = null
             reproValues = null
         }
@@ -75,20 +68,19 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
     fun reset() {
         eiState = EiState()
         hasRun = false
-        usedThisRun.clear()
+        fuzzState.resetForNewRun()
     }
 
     /**
      * the full stack trace of the current EI state
      * should be invoked after getExecutionIndex was called on lastEvent
      */
-    private val fullStackTrace: List<StackTraceLine>
-        get() = (0 until eiState.depth + 1).map { i ->
-            val iid = eiState.rollingIndex[2 * i]
-            val count = eiState.rollingIndex[2 * i + 1]
-            val callLocation = Server.callLocations[iid]!!
-            StackTraceLine(callLocation, count)
-        }
+    fun getFullStackTrace(): List<StackTraceLine> = (0 until eiState.depth + 1).map { i ->
+        val iid = eiState.rollingIndex[2 * i]
+        val count = eiState.rollingIndex[2 * i + 1]
+        val callLocation = Server.callLocations[iid]!!
+        StackTraceLine(callLocation, count)
+    }
 
     /**
      * When this object is not in repro mode (invoked through `reproWithFile`), this will read existing bytes from
@@ -104,14 +96,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
                 // Get the execution index of the last event
                 val executionIndex = eiState.getExecutionIndex(lastEvent!!)
                 log("\tREAD " + eventToString(lastEvent!!))
-                usedThisRun.add(executionIndex)
-                // Attempt to get a value from the map, or else generate a random value
-                return eiMap.computeIfAbsent(executionIndex) {
-                    EiData(
-                            fullStackTrace,
-                            reproValues?.next() ?: rng.nextInt(256)
-                    )
-                }.choice
+                return fuzzState.add(executionIndex)
             }
         }
     }
@@ -180,7 +165,7 @@ class EiManualMutateGuidance(private val rng: Random) : Guidance {
      * simply produces all the bytes in the order that they were requested.
      */
     private fun getLastRunBytes(): ByteArray {
-        return usedThisRun.map { k -> eiMap[k]!!.choice.toByte() }.toByteArray()
+        return fuzzState.usedThisRun.map { k -> fuzzState.eiMap[k]!!.choice.toByte() }.toByteArray()
     }
 
     fun writeLastRunToFile(dest: File) {
