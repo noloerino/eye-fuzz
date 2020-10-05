@@ -3,6 +3,8 @@ import { MithrilTsxComponent } from 'mithril-tsx-component';
 
 const SERVER_URL = "http://localhost:8000";
 
+const storage = window.localStorage;
+
 interface ExecutionIndexDisplayAttrs {
     eiTableData: EiWithData[];
     prevEiChoices: Map<ExecutionIndex, number>;
@@ -178,6 +180,15 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     availableLoadFiles: string[] | undefined;
     availableLoadSessions: string[] | undefined;
 
+    private _classNameFilter: string = storage.getItem("classNameFilter") ?? "";
+    get classNameFilter(): string {
+        return this._classNameFilter;
+    }
+    set classNameFilter(value) {
+        storage.setItem("classNameFilter", value);
+        this._classNameFilter = value;
+    }
+
     oninit() {
         this.getEiAndGenOutput();
         this.getLoadFiles();
@@ -235,26 +246,24 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             })
                 .then((arr: EiWithData[]) =>
                     arr.map(({ei, eiHash, stackTrace, choice, used}) => {
-                            const targetClass = "JavaScriptCodeGenerator";
-                            let filteredStackTrace: StackTraceLine[] =
-                                // stackTrace;
-                                stackTrace.filter((l: StackTraceLine) =>
-                                    (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                                    || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
-                                );
-                            let eiString = "";
-                            for (let i = 0; i < ei.length; i += 2) {
-                                eiString += ei[i] + " (" + ei[i + 1] + ")\n"
-                            }
-                            return {
-                                ei: eiString,
-                                eiHash,
-                                choice,
-                                stackTrace: filteredStackTrace,
-                                used,
-                            };
+                        let targetClass = this.classNameFilter;
+                        let filteredStackTrace: StackTraceLine[] =
+                            stackTrace.filter((l: StackTraceLine) =>
+                                (l.callLocation.containingClass.indexOf(targetClass) >= 0)
+                                || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                            );
+                        let eiString = "";
+                        for (let i = 0; i < ei.length; i += 2) {
+                            eiString += ei[i] + " (" + ei[i + 1] + ")\n"
                         }
-                    ))
+                        return {
+                            ei: eiString,
+                            eiHash,
+                            choice,
+                            stackTrace: filteredStackTrace,
+                            used,
+                        };
+                    }))
                 .catch(e =>
                     [{ei: "ERROR " + e.message, eiHash: "", choice: 0, stackTrace: [], used: false}]
                 )
@@ -424,6 +433,14 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                }}
                         />
                         Show unused EI
+                    </label>
+                    <br />
+                    <label>
+                        Filter EI by class name:{" "}
+                        <input type="text" id="classNameFilter" value={this.classNameFilter} oninput={(e: Event) => {
+                            this.classNameFilter = (e.target as HTMLInputElement).value;
+                        }}
+                        />
                     </label>
                 </div>
                 <table>
