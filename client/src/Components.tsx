@@ -1,41 +1,22 @@
 import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
+import "./common";
+import {EiWithData, ExecutionIndex, StackTraceLine} from "./common";
 
 const SERVER_URL = "http://localhost:8000";
 
 const storage = window.localStorage;
 
-interface ExecutionIndexDisplayAttrs {
+type ExecutionIndexDisplayAttrs = {
     eiTableData: EiWithData[];
     prevEiChoices: Map<ExecutionIndex, number>;
     newEiChoices: Map<number, number>;
     showUnused: boolean;
-}
-
-interface StackTraceLine {
-    callLocation: {
-        iid: number;
-        containingClass: string;
-        containingMethodName: string;
-        lineNumber: number;
-        invokedMethodName: string;
-    };
-    count: number;
-}
+};
 
 function serializeStackTraceLine(l: StackTraceLine): string {
     let cl = l.callLocation;
     return `(${l.count}) ${cl.containingClass}#${cl.containingMethodName}()@${cl.lineNumber} --> ${cl.invokedMethodName}`;
-}
-
-type ExecutionIndex = string;
-
-interface EiWithData {
-    ei: ExecutionIndex;
-    eiHash: string;
-    choice: number;
-    stackTrace: StackTraceLine[];
-    used: boolean;
 }
 
 class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAttrs> {
@@ -107,10 +88,10 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
     }
 }
 
-interface GenOutputDisplayAttrs {
+type GenOutputDisplayAttrs = {
     currOutput: string;
     prevOutput: string;
-}
+};
 
 const GEN_CELL_STYLE = {
     maxHeight: "20em",
@@ -158,15 +139,15 @@ class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
     }
 }
 
-interface RunInfo {
+type RunInfo = {
     eiTableData: EiWithData[];
     genOutput: string;
-}
+};
 
-interface OldRunInfo {
+type OldRunInfo = {
     oldEiChoices: Map<ExecutionIndex, number>;
     genOutput: string;
-}
+};
 
 export class RootTable extends MithrilTsxComponent<{ }> {
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};

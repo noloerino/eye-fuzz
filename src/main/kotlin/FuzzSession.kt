@@ -2,6 +2,7 @@ import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import kotlinx.serialization.Serializable
 import java.util.*
 
+// TODO need to store initial state (or current state as well), since initial state is NOT empty
 typealias FuzzHistory = List<List<EiDiff>>
 
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
@@ -75,6 +76,8 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
 }
 
+// TODO instead of storing as a sequence of changes, it's more efficient to make each fuzz rerun contain a field
+// for each type of change, e.g. a list/bitset of used, a list of updates, and a list of creations
 @Serializable
 sealed class EiDiff {
     @Serializable
