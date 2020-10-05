@@ -2,8 +2,7 @@ import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import kotlinx.serialization.Serializable
 import java.util.*
 
-// TODO need to store initial state (or current state as well), since initial state is NOT empty
-typealias FuzzHistory = List<List<EiDiff>>
+typealias FuzzHistory = List<RunResult>
 
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
     /**
@@ -20,16 +19,16 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      * Each element in the list contains the sequence of diffs incurred over the course of a single generator run.
      * The last element of the list represents the most recent set of changes.
      */
-    private val diffStack = mutableListOf<MutableList<EiDiff>>()
+    private val diffStack = mutableListOf<RunResult>()
     // resetForNewRun() must be called first, or else this will throw an exception
-    private val diffs: MutableList<EiDiff> get() = diffStack.last()
+    private val currRunResult: RunResult get() = diffStack.last()
 
     // hides mutability of diffs
     val history: FuzzHistory get() = diffStack
 
     fun resetForNewRun() {
         usedThisRun.clear()
-        diffStack.add(mutableListOf())
+        diffStack.add(RunResult())
     }
 
     fun clear() {
@@ -38,14 +37,11 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         diffStack.clear()
     }
 
-    fun reloadFromDiffs(newDiffStack: List<List<EiDiff>>) {
+    fun reloadFromDiffs(newDiffStack: FuzzHistory) {
         clear()
-        newDiffStack.forEach { lst ->
-            diffStack.add(lst.toMutableList())
-            lst.forEach {
-                diffs.add(it)
-                it.apply(this)
-            }
+        newDiffStack.forEach { runResult ->
+            diffStack.add(runResult)
+            runResult.applyUpdate(this)
         }
     }
 
@@ -54,11 +50,11 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      */
     fun add(ei: ExecutionIndex): Int {
         usedThisRun.add(ei)
-        diffs.add(EiDiff.MarkUsed(ei))
+        currRunResult.markUsed(ei)
         // Attempt to get a value from the map, or else generate a random value
         return eiMap.computeIfAbsent(ei) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
-            diffs.add(EiDiff.Create(ei, guidance.getFullStackTrace(), choice))
+            currRunResult.createChoice(ei, guidance.getFullStackTrace(), choice)
             EiData(guidance.getFullStackTrace(), choice)
         }.choice
     }
@@ -67,7 +63,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      * Updates the choice corresponding to the EI with this value.
      */
     fun update(ei: ExecutionIndex, choice: Int) {
-        diffs.add(EiDiff.UpdateChoice(ei, choice))
+        currRunResult.updateChoice(ei, choice)
         eiMap[ei]!!.choice = choice
     }
     
@@ -76,26 +72,60 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
 }
 
-// TODO instead of storing as a sequence of changes, it's more efficient to make each fuzz rerun contain a field
-// for each type of change, e.g. a list/bitset of used, a list of updates, and a list of creations
+typealias SerializableEi = @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex;
+
+/**
+ * Encodes information about changes produced over the course of a run.
+ * A new instance is blank, and should be mutated over the course of a single generator run.
+ *
+ * The updates are applied in the orders listed in the fields: used EI are marked first, followed by updates to existing
+ * EI, followed by creation of new EI.
+ */
 @Serializable
-sealed class EiDiff {
-    @Serializable
-    data class MarkUsed(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex) : EiDiff()
+class RunResult {
 
-    @Serializable
-    data class UpdateChoice(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
-                       val new: Int) : EiDiff()
-    @Serializable
-    data class Create(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
-                 val stackTrace: StackTrace, val choice: Int) : EiDiff()
+    // TODO optimize EI to be stored in an array somewhere to allow for dedup/compression
+    private val markedUsed = mutableSetOf<SerializableEi>()
+    private val updateChoices = mutableListOf<Pair<SerializableEi, Int>>()
+    private val createChoices = mutableListOf<Triple<SerializableEi, StackTrace, Int>>()
 
-    fun apply(state: FuzzState) {
-        when (this) {
-            is MarkUsed -> state.usedThisRun.add(ei)
-            is UpdateChoice -> state.eiMap.replace(ei, EiData(state.eiMap[ei]!!.stackTrace, new))
-            is Create -> state.eiMap[ei] = EiData(stackTrace, choice)
+    fun markUsed(ei: ExecutionIndex) {
+        markedUsed.add(ei)
+    }
+
+    fun updateChoice(ei: ExecutionIndex, choice: Int) {
+        updateChoices.add(ei to choice)
+    }
+
+    fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int) {
+        createChoices.add(Triple(ei, stackTrace, choice))
+    }
+
+    fun applyUpdate(state: FuzzState) {
+        markedUsed.forEach { state.usedThisRun.add(it) }
+        updateChoices.forEach { (ei, choice) -> state.eiMap[ei]!!.choice = choice }
+        createChoices.forEach {
+            (ei, stackTrace, choice) -> state.eiMap[ei] = EiData(stackTrace, choice)
         }
     }
-}
 
+    fun copy(): RunResult {
+        val other = RunResult();
+        other.markedUsed.addAll(markedUsed)
+        Collections.addAll(other.updateChoices, *updateChoices.toTypedArray())
+        Collections.addAll(other.createChoices, *createChoices.toTypedArray())
+        return other
+    }
+
+    override fun equals(other: Any?): Boolean = other is RunResult
+            && markedUsed == other.markedUsed
+            && updateChoices == other.updateChoices
+            && createChoices == other.createChoices
+
+    override fun hashCode(): Int {
+        var result = markedUsed.hashCode()
+        result = 31 * result + updateChoices.hashCode()
+        result = 31 * result + createChoices.hashCode()
+        return result
+    }
+}

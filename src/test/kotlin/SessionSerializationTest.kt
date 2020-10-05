@@ -32,7 +32,7 @@ class SessionSerializationTest {
             newEis.forEach { state.add(it) }
         }
         // Make clones of the list in case some funky mutation occurs
-        val originalHistory = listOf(*state.history.map { listOf(*it.toTypedArray()) }.toTypedArray())
+        val originalHistory = state.history.map { it.copy() }
         val decodedHistory: FuzzHistory = Json.decodeFromString(Json.encodeToString(originalHistory))
         assertEquals(originalHistory, decodedHistory)
     }
