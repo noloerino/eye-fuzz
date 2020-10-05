@@ -2,6 +2,7 @@ import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "./common";
 import {EiWithData, ExecutionIndex, StackTraceLine} from "./common";
+import FuzzHistory from "./FuzzHistory";
 
 const SERVER_URL = "http://localhost:8000";
 
@@ -17,6 +18,14 @@ type ExecutionIndexDisplayAttrs = {
 function serializeStackTraceLine(l: StackTraceLine): string {
     let cl = l.callLocation;
     return `(${l.count}) ${cl.containingClass}#${cl.containingMethodName}()@${cl.lineNumber} --> ${cl.invokedMethodName}`;
+}
+
+function displayEi(ei: ExecutionIndex): string {
+    let eiString = "";
+    for (let i = 0; i < ei.length; i += 2) {
+        eiString += ei[i] + " (" + ei[i + 1] + ")\n"
+    }
+    return eiString;
 }
 
 class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAttrs> {
@@ -44,7 +53,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 textOverflow: "clip",
                                 whiteSpace: "pre-wrap"
                             }}>
-                                {ei}
+                                {displayEi(ei)}
                             </td>
                             <td style={{textAlign: "center"}}>
                                 {eiHash}
@@ -61,7 +70,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 {stackTrace.map(serializeStackTraceLine).join("\n")}
                             </td>
                             <td style={{textAlign: "center"}}>
-                                <span>{vnode.attrs.prevEiChoices.get(ei) ?? "--"}</span>
+                                <span>{vnode.attrs.prevEiChoices.get(JSON.stringify(ei)) ?? "--"}</span>
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <span>{choice}</span>
@@ -150,6 +159,7 @@ type OldRunInfo = {
 };
 
 export class RootTable extends MithrilTsxComponent<{ }> {
+    history: FuzzHistory = { runResults: [] };
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
     prevRunInfo: OldRunInfo = {oldEiChoices: new Map(), genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
@@ -179,13 +189,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     // Returns a promise to allow us to await on the result on this request
     updateEi(): Promise<void> {
         let arr = Array.from(this.newEiChoices.entries()).map(([i, choice]) => ({
-            ei: JSON.parse(
-                "[" + (
-                    this.currRunInfo.eiTableData[i].ei.replace(/[()]/g, "")
-                        .replace(/\n/g, " ")
-                        .trim()
-                        .replace(/ /g, ",")
-                ) + "]"),
+            ei: this.currRunInfo.eiTableData[i].ei,
             choice
         }));
         this.newEiChoices.clear();
@@ -210,6 +214,12 @@ export class RootTable extends MithrilTsxComponent<{ }> {
      */
     getEiAndGenOutput() {
         Promise.all([
+            // TODO temporary hack here that refetches history every time
+            // eventually have API return all state updates in single object
+            m.request({
+                method: "GET",
+                url: SERVER_URL + "/history",
+            }),
             // Get generator output
             // Mithril type defs don't yet have responseType, but excluding will cause it to just try and fail to read JSON
             // @ts-ignore
@@ -217,9 +227,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 method: "GET",
                 url: SERVER_URL + "/generator",
                 responseType: "text",
-            })
-                // Needed to type check for now
-                .then((responseText: string) => responseText),
+            }),
             // Get new EI
             m.request({
                 method: "GET",
@@ -233,12 +241,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 (l.callLocation.containingClass.indexOf(targetClass) >= 0)
                                 || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
                             );
-                        let eiString = "";
-                        for (let i = 0; i < ei.length; i += 2) {
-                            eiString += ei[i] + " (" + ei[i + 1] + ")\n"
-                        }
                         return {
-                            ei: eiString,
+                            ei,
                             eiHash,
                             choice,
                             stackTrace: filteredStackTrace,
@@ -249,10 +253,16 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     [{ei: "ERROR " + e.message, eiHash: "", choice: 0, stackTrace: [], used: false}]
                 )
         ])
-            .then(([genOutput, eiData]) => {
+            .then(([history, genOutput, eiData]: [FuzzHistory, string, EiWithData[]]) => {
+                this.history = history;
                 let oldEiChoices = new Map();
-                for (let {ei, choice} of this.currRunInfo.eiTableData) {
-                    oldEiChoices.set(ei, choice);
+                // TODO because updates are stored BEFORE a generator run is reset, we actually need to
+                // look at -2 from the end
+                let lastUpdates = history.runResults[history.runResults.length - 2]?.updateChoices ?? [];
+                // Annoyingly, we need to stringify the EI before storing it because ES6 maps use Object.is
+                // to compare equality, which essentially checks references for non-string objects (including arrays)
+                for (let {ei, old} of lastUpdates) {
+                    oldEiChoices.set(JSON.stringify(ei), old);
                 }
                 this.prevRunInfo = {
                     oldEiChoices,
@@ -261,7 +271,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 this.currRunInfo = {
                     eiTableData: eiData,
                     genOutput,
-                }
+                };
             });
     }
 
@@ -386,7 +396,10 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                     url: SERVER_URL + "/load_session",
                                     body: {fileName: loadFileName},
                                 })
-                                    .then(() => console.log("Loaded session", loadFileName))
+                                    .then((history: FuzzHistory) => {
+                                        console.log("Loaded session", loadFileName);
+                                        this.history = history;
+                                    })
                                     .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
                                 this.loadSessionName = undefined;
                             }

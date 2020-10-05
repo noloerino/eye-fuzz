@@ -6,27 +6,18 @@ import {ExecutionIndex, StackTraceLine} from "./common"
 
 type StackTrace = StackTraceLine[];
 
-// types in tagged union should match FuzzSession.kt
-type MarkUsed = {
-    type: "EiDiff.MarkUsed";
-    ei: ExecutionIndex;
-};
-
-type UpdateChoice = {
-    type: "EiDiff.UpdateChoice";
-    ei: ExecutionIndex;
-    "new": number;
-};
-
-type Create = {
-    type: "EiDiff.Create";
-    ei: ExecutionIndex;
-    stackTrace: StackTrace;
-    choice: number;
-};
-
-type EiDiff = MarkUsed | UpdateChoice | Create;
-
-class FuzzHistory {
-    diffs: EiDiff[][];
+export default class FuzzHistory {
+    runResults: {
+        markUsed: ExecutionIndex[],
+        updateChoices: {
+            ei: ExecutionIndex,
+            old: number,
+            "new": number,
+        }[],
+        createChoices: {
+            ei: ExecutionIndex,
+            stackTrace: StackTrace,
+            "new": number,
+        }[],
+    }[];
 }

@@ -171,6 +171,9 @@ object Server {
                 return "OK"
             }
         })
+        server.createContext("/history", object : ResponseHandler("history") {
+            override fun onGet(): String = Json.encodeToString(genGuidance.fuzzState.history)
+        })
         server.createContext("/save_input", SaveInputHandler())
         server.createContext("/load_input", LoadInputHandler())
         server.createContext("/save_session", SaveSessionHandler())
@@ -329,8 +332,8 @@ object Server {
             println("Loading session history from ${loadFile.canonicalPath}")
             genGuidance.loadSessionHistory(loadFile)
             MainThreadTask.RERUN_GENERATOR.requestWork()
-//            return Json.encodeToString(genGuidance.fuzzState.history)
-            return "OK"
+            return Json.encodeToString(genGuidance.fuzzState.history)
+//            return "OK"
         }
     }
 

@@ -180,7 +180,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
 
     fun loadSessionHistory(src: File) {
         val newHistory: FuzzHistory = Json.decodeFromString(src.readText())
-        fuzzState.reloadFromDiffs(newHistory)
+        fuzzState.reloadFromHistory(newHistory)
     }
 
     companion object {

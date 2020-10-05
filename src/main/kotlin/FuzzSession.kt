@@ -2,7 +2,8 @@ import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import kotlinx.serialization.Serializable
 import java.util.*
 
-typealias FuzzHistory = List<RunResult>
+@Serializable
+data class FuzzHistory(val runResults: List<RunResult>)
 
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
     /**
@@ -24,7 +25,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     private val currRunResult: RunResult get() = diffStack.last()
 
     // hides mutability of diffs
-    val history: FuzzHistory get() = diffStack
+    val history: FuzzHistory get() = FuzzHistory(diffStack)
 
     fun resetForNewRun() {
         usedThisRun.clear()
@@ -37,9 +38,9 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         diffStack.clear()
     }
 
-    fun reloadFromDiffs(newDiffStack: FuzzHistory) {
+    fun reloadFromHistory(newHistory: FuzzHistory) {
         clear()
-        newDiffStack.forEach { runResult ->
+        newHistory.runResults.forEach { runResult ->
             diffStack.add(runResult)
             runResult.applyUpdate(this)
         }
@@ -54,6 +55,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         // Attempt to get a value from the map, or else generate a random value
         return eiMap.computeIfAbsent(ei) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
+            // TODO handle case of repro, where this may actually be an update rather than create
             currRunResult.createChoice(ei, guidance.getFullStackTrace(), choice)
             EiData(guidance.getFullStackTrace(), choice)
         }.choice
@@ -63,7 +65,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      * Updates the choice corresponding to the EI with this value.
      */
     fun update(ei: ExecutionIndex, choice: Int) {
-        currRunResult.updateChoice(ei, choice)
+        currRunResult.updateChoice(ei, eiMap[ei]!!.choice, choice)
         eiMap[ei]!!.choice = choice
     }
     
@@ -72,7 +74,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
 }
 
-typealias SerializableEi = @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex;
+typealias SerializableEi = @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex
 
 /**
  * Encodes information about changes produced over the course of a run.
@@ -84,21 +86,27 @@ typealias SerializableEi = @Serializable(with = ExecutionIndexSerializer::class)
 @Serializable
 class RunResult {
 
+    @Serializable
+    data class UpdateChoice(val ei: SerializableEi, val old: Int, val new: Int)
+
+    @Serializable
+    data class CreateChoice(val ei: SerializableEi, val stackTrace: StackTrace, val new: Int)
+
     // TODO optimize EI to be stored in an array somewhere to allow for dedup/compression
     private val markedUsed = mutableSetOf<SerializableEi>()
-    private val updateChoices = mutableListOf<Pair<SerializableEi, Int>>()
-    private val createChoices = mutableListOf<Triple<SerializableEi, StackTrace, Int>>()
+    private val updateChoices = mutableListOf<UpdateChoice>()
+    private val createChoices = mutableListOf<CreateChoice>()
 
     fun markUsed(ei: ExecutionIndex) {
         markedUsed.add(ei)
     }
 
-    fun updateChoice(ei: ExecutionIndex, choice: Int) {
-        updateChoices.add(ei to choice)
+    fun updateChoice(ei: ExecutionIndex, old: Int, choice: Int) {
+        updateChoices.add(UpdateChoice(ei, old, choice))
     }
 
     fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int) {
-        createChoices.add(Triple(ei, stackTrace, choice))
+        createChoices.add(CreateChoice(ei, stackTrace, choice))
     }
 
     fun applyUpdate(state: FuzzState) {
@@ -110,7 +118,7 @@ class RunResult {
     }
 
     fun copy(): RunResult {
-        val other = RunResult();
+        val other = RunResult()
         other.markedUsed.addAll(markedUsed)
         Collections.addAll(other.updateChoices, *updateChoices.toTypedArray())
         Collections.addAll(other.createChoices, *createChoices.toTypedArray())
