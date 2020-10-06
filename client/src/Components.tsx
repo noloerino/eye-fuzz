@@ -10,7 +10,9 @@ const storage = window.localStorage;
 
 type ExecutionIndexDisplayAttrs = {
     eiTableData: EiWithData[];
-    prevEiChoices: Map<ExecutionIndex, number>;
+    history: FuzzHistory;
+    historyDepth: number;
+    historicChoices: Map<ExecutionIndex, number | null>;
     newEiChoices: Map<number, number>;
     showUnused: boolean;
 };
@@ -28,6 +30,34 @@ function displayEi(ei: ExecutionIndex): string {
     return eiString;
 }
 
+/**
+ * Returns a map of old choices for the specified depth.
+ * If an EI didn't exist at a given point in history, its value will be null; if it existed but its value has not
+ * been changed, then undefined is returned.
+ * @param history
+ * @param ago
+ */
+function getHistoricChoices(history: FuzzHistory, ago: number): Map<ExecutionIndex, number | null> {
+    let oldEiChoices = new Map();
+    // Examine every update or create from current to (ago) creations in the past
+    let i = 0;
+    for (i = 0; i < ago; i++) {
+        let lastUpdates = history.runResults[history.runResults.length - ago]?.updateChoices ?? [];
+        // Annoyingly, we need to stringify the EI before storing it because ES6 maps use Object.is
+        // to compare equality, which essentially checks references for non-string objects (including arrays)
+        lastUpdates.forEach(({ei, old}) => oldEiChoices.set(JSON.stringify(ei), old));
+        let lastCreates = history.runResults[history.runResults.length - ago]?.createChoices ?? [];
+        lastCreates.forEach(({ei}) => oldEiChoices.set(JSON.stringify(ei), null));
+    }
+    // TODO because updates are stored BEFORE a generator run is reset, we actually need to
+    // look one extra level for updates
+    {
+        let lastUpdates = history.runResults[history.runResults.length - i]?.updateChoices ?? [];
+        lastUpdates.forEach(({ei, old}) => oldEiChoices.set(JSON.stringify(ei), old));
+    }
+    return oldEiChoices;
+}
+
 class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAttrs> {
     view(vnode: Vnode<ExecutionIndexDisplayAttrs, this>) {
         return (
@@ -38,7 +68,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <th scope="col">Hash</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
-                    <th scope="col">Previous Value</th>
+                    <th scope="col">Value {vnode.attrs.historyDepth - 1} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
                 </tr>
@@ -69,8 +99,14 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                             }}>
                                 {stackTrace.map(serializeStackTraceLine).join("\n")}
                             </td>
-                            <td style={{textAlign: "center"}}>
-                                <span>{vnode.attrs.prevEiChoices.get(JSON.stringify(ei)) ?? "--"}</span>
+                            <td id="lessRecent" style={{textAlign: "center"}}>
+                                <span>{
+                                    // If the key is absent, then the value is the same as the current choice; if it
+                                    // is present but null then it didn't yet exist
+                                    vnode.attrs.historicChoices.has(JSON.stringify(ei))
+                                        ? (vnode.attrs.historicChoices.get(JSON.stringify(ei)) ?? "--")
+                                        : choice
+                                }</span>
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <span>{choice}</span>
@@ -171,6 +207,16 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     availableLoadFiles: string[] | undefined;
     availableLoadSessions: string[] | undefined;
 
+    /**
+     * The number of steps back in the history to display; 0 means the most recent set of values is displayed,
+     * 1 means the previous set and the set before, etc..
+     */
+    historyDepth: number;
+
+    resetHistoryDepth() {
+        this.historyDepth = 1;
+    }
+
     private _classNameFilter: string = storage.getItem("classNameFilter") ?? "";
     get classNameFilter(): string {
         return this._classNameFilter;
@@ -181,6 +227,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     }
 
     oninit() {
+        this.resetHistoryDepth();
         this.getEiAndGenOutput();
         this.getLoadFiles();
         this.getLoadSessions();
@@ -255,19 +302,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         ])
             .then(([history, genOutput, eiData]: [FuzzHistory, string, EiWithData[]]) => {
                 this.history = history;
-                let oldEiChoices = new Map();
-                // TODO because updates are stored BEFORE a generator run is reset, we actually need to
-                // look at -2 from the end
-                let lastUpdates = history.runResults[history.runResults.length - 2]?.updateChoices ?? [];
-                // Annoyingly, we need to stringify the EI before storing it because ES6 maps use Object.is
-                // to compare equality, which essentially checks references for non-string objects (including arrays)
-                for (let {ei, old} of lastUpdates) {
-                    oldEiChoices.set(JSON.stringify(ei), old);
-                }
-                this.prevRunInfo = {
-                    oldEiChoices,
-                    genOutput: this.currRunInfo.genOutput,
-                };
+                this.resetHistoryDepth();
                 this.currRunInfo = {
                     eiTableData: eiData,
                     genOutput,
@@ -399,6 +434,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                     .then((history: FuzzHistory) => {
                                         console.log("Loaded session", loadFileName);
                                         this.history = history;
+                                        this.resetHistoryDepth();
                                     })
                                     .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
                                 this.loadSessionName = undefined;
@@ -436,6 +472,19 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         }}
                         />
                     </label>
+                    <div>
+                        <label>
+                            View history:{" "}
+                            {/* Left = further back in history = increment*/}
+                            <button onclick={
+                                () => this.historyDepth = Math.min(this.historyDepth + 1, this.history.runResults.length)
+                            }>&lt;--</button>
+                            {/* Right = more recent in history = decrement*/}
+                            <button onclick={
+                                () => this.historyDepth = Math.max(this.historyDepth - 1, 1)
+                            }>--&gt;</button>
+                        </label>
+                    </div>
                 </div>
                 <table>
                     <tbody>
@@ -443,7 +492,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         <td>
                             <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData}
                                                    newEiChoices={this.newEiChoices}
-                                                   prevEiChoices={this.prevRunInfo.oldEiChoices}
+                                                   history={this.history}
+                                                   historyDepth={this.historyDepth}
+                                                   historicChoices={getHistoricChoices(this.history, this.historyDepth)}
                                                    showUnused={this.showUnused}/>
                         </td>
                         <td>
