@@ -42,18 +42,14 @@ function getHistoricChoices(history: FuzzHistory, ago: number): Map<ExecutionInd
     // Examine every update or create from current to (ago) creations in the past
     let i = 0;
     for (i = 0; i < ago; i++) {
-        let lastUpdates = history.runResults[history.runResults.length - ago]?.updateChoices ?? [];
+        // TODO because updates are stored BEFORE a generator run is reset, we actually need to
+        // look one level deeper for updates
+        let lastUpdates = history.runResults[history.runResults.length - ago - 1]?.updateChoices ?? [];
         // Annoyingly, we need to stringify the EI before storing it because ES6 maps use Object.is
         // to compare equality, which essentially checks references for non-string objects (including arrays)
         lastUpdates.forEach(({ei, old}) => oldEiChoices.set(JSON.stringify(ei), old));
         let lastCreates = history.runResults[history.runResults.length - ago]?.createChoices ?? [];
         lastCreates.forEach(({ei}) => oldEiChoices.set(JSON.stringify(ei), null));
-    }
-    // TODO because updates are stored BEFORE a generator run is reset, we actually need to
-    // look one extra level for updates
-    {
-        let lastUpdates = history.runResults[history.runResults.length - i]?.updateChoices ?? [];
-        lastUpdates.forEach(({ei, old}) => oldEiChoices.set(JSON.stringify(ei), old));
     }
     return oldEiChoices;
 }
@@ -68,7 +64,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <th scope="col">Hash</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
-                    <th scope="col">Value {vnode.attrs.historyDepth - 1} Run(s) Ago</th>
+                    <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
                 </tr>
