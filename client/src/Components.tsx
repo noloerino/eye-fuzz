@@ -61,7 +61,6 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                 <thead>
                 <tr>
                     <th scope="col">ExecutionIndex</th>
-                    <th scope="col">Hash</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
@@ -80,9 +79,6 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 whiteSpace: "pre-wrap"
                             }}>
                                 {displayEi(ei)}
-                            </td>
-                            <td style={{textAlign: "center"}}>
-                                {eiHash}
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="checkbox" disabled={true} checked={used} />
