@@ -30,7 +30,6 @@ object Server {
     private val rng = Random()
     private val genGuidance = EiManualMutateGuidance(rng)
     private val jsGen = JavaScriptCodeGenerator()
-    private var genContents: String? = null
 
     var mainThread: Thread? = null
 
@@ -208,7 +207,8 @@ object Server {
     }
 
     private fun getGenContents(): String {
-        return genContents!!.substring(0, genContents!!.length.coerceAtMost(1024))
+        val genContents = genGuidance.fuzzState.genOutput
+        return genContents.substring(0, genContents.length.coerceAtMost(1024))
     }
 
     /**
@@ -222,7 +222,8 @@ object Server {
         val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
         val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
-        genContents = jsGen.generate(random, genStatus)
+        genGuidance.fuzzState.genOutput = jsGen.generate(random, genStatus)
+        println(genGuidance.history.runResults.map { it.result })
         println("generator produced: " + getGenContents())
     }
 

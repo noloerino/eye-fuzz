@@ -132,6 +132,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
 type GenOutputDisplayAttrs = {
     currOutput: string;
     prevOutput: string;
+    ago: number;
 };
 
 const GEN_CELL_STYLE = {
@@ -164,7 +165,7 @@ class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
                 <table>
                     <thead>
                     <tr>
-                        <th scope="col">Previous Generator Output</th>
+                        <th scope="col">Generator Output {vnode.attrs.ago} Runs Ago</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -185,15 +186,9 @@ type RunInfo = {
     genOutput: string;
 };
 
-type OldRunInfo = {
-    oldEiChoices: Map<ExecutionIndex, number>;
-    genOutput: string;
-};
-
 export class RootTable extends MithrilTsxComponent<{ }> {
     history: FuzzHistory = { runResults: [] };
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
-    prevRunInfo: OldRunInfo = {oldEiChoices: new Map(), genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
     showUnused: boolean = true;
     saveFileName: string | undefined;
@@ -495,7 +490,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         </td>
                         <td>
                             <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
-                                              prevOutput={this.prevRunInfo.genOutput}/>
+                                              prevOutput={this.history.runResults[this.history.runResults.length - this.historyDepth - 1]?.result ?? ""}
+                                              ago={this.historyDepth}/>
                         </td>
                     </tr>
                     </tbody>

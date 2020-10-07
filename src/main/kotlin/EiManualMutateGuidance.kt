@@ -26,7 +26,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     private var hasRun = false
 
     val fuzzState = FuzzState(this, rng)
-    val history by ::fuzzState
+    val history: FuzzHistory by fuzzState::history
 
     /**
      * During a repro run, the original EI map is saved here. Any values that did not appear in the repro EI run

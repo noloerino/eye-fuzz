@@ -8,6 +8,7 @@ type StackTrace = StackTraceLine[];
 
 export default class FuzzHistory {
     runResults: {
+        result: string;
         markUsed: ExecutionIndex[],
         updateChoices: {
             ei: ExecutionIndex,

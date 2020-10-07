@@ -19,12 +19,15 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     /**
      * Each element in the list contains the sequence of diffs incurred over the course of a single generator run.
      * The last element of the list represents the most recent set of changes.
+     *
+     * The initial element is an empty result.
      */
-    private val diffStack = mutableListOf<RunResult>()
-    // resetForNewRun() must be called first, or else this will throw an exception
+    private val diffStack = mutableListOf(RunResult())
     private val currRunResult: RunResult get() = diffStack.last()
+    var genOutput get() = currRunResult.result
+        set(v) { currRunResult.result = v }
 
-    // hides mutability of diffs
+    // hides mutability of diffs, and remove first sentinel node
     val history: FuzzHistory get() = FuzzHistory(diffStack)
 
     fun resetForNewRun() {
@@ -92,7 +95,7 @@ class RunResult {
     @Serializable
     data class CreateChoice(val ei: SerializableEi, val stackTrace: StackTrace, val new: Int)
 
-    // TODO optimize EI to be stored in an array somewhere to allow for dedup/compression
+    var result: String = ""
     private val markedUsed = mutableSetOf<SerializableEi>()
     private val updateChoices = mutableListOf<UpdateChoice>()
     private val createChoices = mutableListOf<CreateChoice>()
