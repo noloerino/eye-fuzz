@@ -83,8 +83,8 @@ typealias SerializableEi = @Serializable(with = ExecutionIndexSerializer::class)
  * Encodes information about changes produced over the course of a run.
  * A new instance is blank, and should be mutated over the course of a single generator run.
  *
- * The updates are applied in the orders listed in the fields: used EI are marked first, followed by updates to existing
- * EI, followed by creation of new EI.
+ * The updates are applied in the orders listed in the fields: used EI are marked first, followed by creation of new EI
+ * followed by updates to existing EI.
  */
 @Serializable
 class RunResult {
@@ -97,8 +97,8 @@ class RunResult {
 
     var result: String = ""
     private val markedUsed = mutableSetOf<SerializableEi>()
-    private val updateChoices = mutableListOf<UpdateChoice>()
     private val createChoices = mutableListOf<CreateChoice>()
+    private val updateChoices = mutableListOf<UpdateChoice>()
 
     fun markUsed(ei: ExecutionIndex) {
         markedUsed.add(ei)
@@ -114,10 +114,10 @@ class RunResult {
 
     fun applyUpdate(state: FuzzState) {
         markedUsed.forEach { state.usedThisRun.add(it) }
-        updateChoices.forEach { (ei, choice) -> state.eiMap[ei]!!.choice = choice }
         createChoices.forEach {
             (ei, stackTrace, choice) -> state.eiMap[ei] = EiData(stackTrace, choice)
         }
+        updateChoices.forEach { (ei, choice) -> state.eiMap[ei]!!.choice = choice }
     }
 
     fun copy(): RunResult {
