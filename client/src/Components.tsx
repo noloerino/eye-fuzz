@@ -320,160 +320,182 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     view() {
         return (
             <div>
-                <div id="controlPanel">
-                    <button type="submit" onclick={() =>
-                        this.updateEi()
-                            .then(() => this.postGenOutput())
-                            .then(() => this.getEiAndGenOutput())
-                    }>
-                        Rerun generator
-                    </button>
-                    <br />
-                    <button type="submit" onclick={() =>{
-                        m.request({
-                            method: "POST",
-                            url: SERVER_URL + "/reset",
-                        })
-                            .then(() => console.log("Cleared existing EI"))
-                            .then(() => this.getEiAndGenOutput());
-                    }}>
-                        Restart from scratch
-                    </button>
+                <table id="controlPanel">
+                    <caption style={{textAlign: "left"}}>Controls</caption>
+                    <thead>
+                        <th>Generator</th>
+                        <th>View</th>
+                        <th>Session</th>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            {/* generator */}
+                            <td>
+                                <button type="submit" onclick={() =>
+                                    this.updateEi()
+                                        .then(() => this.postGenOutput())
+                                        .then(() => this.getEiAndGenOutput())
+                                }>
+                                    Rerun generator
+                                </button>
+                                <div>
+                                    <form id="saveInputForm" onsubmit={(e: Event) => {
+                                        let saveFileName = this.saveFileName;
+                                        e.preventDefault();
+                                        m.request({
+                                            method: "POST",
+                                            url: SERVER_URL + "/save_input",
+                                            body: {fileName: saveFileName},
+                                        }).then(() => console.log("Saved file", saveFileName, "(probably)"));
+                                        this.saveFileName = undefined;
+                                    }}>
+                                        <label>
+                                            Save last input to file:{" "}
+                                            <input type="text" value={this.saveFileName} required oninput={(e: InputEvent) =>
+                                                this.saveFileName = (e.target!! as HTMLInputElement).value
+                                            }/>
+                                        </label>
+                                        {/* TODO add feedback for save success/fail */}
+                                        <button type="submit">Save</button>
+                                    </form>
+                                    <form id="loadInputForm" method="POST" onsubmit={(e: Event) => {
+                                        let loadFileName = this.loadFileName;
+                                        e.preventDefault();
+                                        if (loadFileName) {
+                                            m.request({
+                                                method: "POST",
+                                                url: SERVER_URL + "/load_input",
+                                                body: {fileName: loadFileName},
+                                            })
+                                                .then(() => console.log("Loaded file", loadFileName))
+                                                .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
+                                            this.loadFileName = undefined;
+                                        }
+                                    }}>
+                                        <label>
+                                            Load input file:{" "}
+                                            <select value={this.loadFileName} onchange={(e: Event) => {
+                                                this.loadFileName = (e.target!! as HTMLSelectElement).value;
+                                            }}>
+                                                <option value=""/>
+                                                {
+                                                    this.availableLoadFiles?.map((fileName: string) =>
+                                                        <option value={fileName}>{fileName}</option>)
+                                                }
+                                            </select>
+                                        </label>
+                                        <button type="submit">Load</button>
+                                    </form>
+                                </div>
+                            </td>
 
-                    <div>
-                        <form id="saveInputForm" onsubmit={(e: Event) => {
-                            let saveFileName = this.saveFileName;
-                            e.preventDefault();
-                            m.request({
-                                method: "POST",
-                                url: SERVER_URL + "/save_input",
-                                body: {fileName: saveFileName},
-                            }).then(() => console.log("Saved file", saveFileName, "(probably)"));
-                            this.saveFileName = undefined;
-                        }}>
-                            <label>
-                                Save last input to file:{" "}
-                                <input type="text" value={this.saveFileName} required oninput={(e: InputEvent) =>
-                                    this.saveFileName = (e.target!! as HTMLInputElement).value
-                                }/>
-                            </label>
-                            {/* TODO add feedback for save success/fail */}
-                            <button type="submit">Save</button>
-                        </form>
-                        <form id="loadInputForm" method="POST" onsubmit={(e: Event) => {
-                            let loadFileName = this.loadFileName;
-                            e.preventDefault();
-                            if (loadFileName) {
-                                m.request({
-                                    method: "POST",
-                                    url: SERVER_URL + "/load_input",
-                                    body: {fileName: loadFileName},
-                                })
-                                    .then(() => console.log("Loaded file", loadFileName))
-                                    .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
-                                this.loadFileName = undefined;
-                            }
-                        }}>
-                            <label>
-                                Load input file:{" "}
-                                <select value={this.loadFileName} onchange={(e: Event) => {
-                                    this.loadFileName = (e.target!! as HTMLSelectElement).value;
-                                }}>
-                                    <option value=""/>
-                                    {
-                                        this.availableLoadFiles?.map((fileName: string) =>
-                                            <option value={fileName}>{fileName}</option>)
-                                    }
-                                </select>
-                            </label>
-                            <button type="submit">Load</button>
-                        </form>
-                    </div>
+                            {/* view */}
+                            <td>
 
-                    <div>
-                        <form id="saveSessionForm" onsubmit={(e: Event) => {
-                            let saveFileName = this.saveSessionName;
-                            e.preventDefault();
-                            m.request({
-                                method: "POST",
-                                url: SERVER_URL + "/save_session",
-                                body: {fileName: saveFileName},
-                            }).then(() => console.log("Saved session", saveFileName, "(probably)"));
-                            this.saveSessionName = undefined;
-                        }}>
-                            <label>
-                                Save current session to file:{" "}
-                                <input type="text" value={this.saveSessionName} required oninput={(e: InputEvent) =>
-                                    this.saveSessionName = (e.target!! as HTMLInputElement).value
-                                }/>
-                            </label>
-                            <button type="submit">Save</button>
-                        </form>
-                        <form id="loadSessionForm" method="POST" onsubmit={(e: Event) => {
-                            let loadFileName = this.loadSessionName;
-                            e.preventDefault();
-                            if (loadFileName) {
-                                m.request({
-                                    method: "POST",
-                                    url: SERVER_URL + "/load_session",
-                                    body: {fileName: loadFileName},
-                                })
-                                    .then((history: FuzzHistory) => {
-                                        console.log("Loaded session", loadFileName);
-                                        this.history = history;
-                                        this.resetHistoryDepth();
+                                <label>
+                                    Show unused EI:{" "}
+                                    <input type="checkbox" id="showUnused" checked={this.showUnused}
+                                           oninput={(e: Event) => {
+                                               this.showUnused = (e.target as HTMLInputElement).checked;
+                                           }}
+                                    />
+                                </label>
+                                <br />
+                                <label>
+                                    Filter EI by class name:{" "}
+                                    <input type="text" id="classNameFilter" value={this.classNameFilter} oninput={(e: Event) => {
+                                        this.classNameFilter = (e.target as HTMLInputElement).value;
+                                    }}
+                                    />
+                                </label>
+                                <div>
+                                    <label>
+                                        View history:{" "}
+                                        {/* Left = further back in history = increment*/}
+                                        <button onclick={
+                                            () => this.historyDepth = Math.min(this.historyDepth + 1, this.history.runResults.length)
+                                        }>&lt;--</button>
+                                        {/* Right = more recent in history = decrement*/}
+                                        <button onclick={
+                                            () => this.historyDepth = Math.max(this.historyDepth - 1, 1)
+                                        }>--&gt;</button>
+                                    </label>
+                                </div>
+                            </td>
+
+                            {/* session */}
+                            <td>
+                                <button type="submit" onclick={() =>{
+                                    m.request({
+                                        method: "POST",
+                                        url: SERVER_URL + "/reset",
                                     })
-                                    .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
-                                this.loadSessionName = undefined;
-                            }
-                        }}>
-                            <label>
-                                Load session from file:{" "}
-                                <select value={this.loadSessionName} onchange={(e: Event) => {
-                                    this.loadSessionName = (e.target!! as HTMLSelectElement).value;
+                                        .then(() => console.log("Cleared existing EI"))
+                                        .then(() => this.getEiAndGenOutput());
                                 }}>
-                                    <option value=""/>
-                                    {
-                                        this.availableLoadSessions?.map((fileName: string) =>
-                                            <option value={fileName}>{fileName}</option>)
-                                    }
-                                </select>
-                            </label>
-                            <button type="submit">Load</button>
-                        </form>
-                    </div>
+                                    Restart from scratch
+                                </button>
 
-                    <label>
-                        <input type="checkbox" id="showUnused" checked={this.showUnused}
-                               oninput={(e: Event) => {
-                                   this.showUnused = (e.target as HTMLInputElement).checked;
-                               }}
-                        />
-                        Show unused EI
-                    </label>
-                    <br />
-                    <label>
-                        Filter EI by class name:{" "}
-                        <input type="text" id="classNameFilter" value={this.classNameFilter} oninput={(e: Event) => {
-                            this.classNameFilter = (e.target as HTMLInputElement).value;
-                        }}
-                        />
-                    </label>
-                    <div>
-                        <label>
-                            View history:{" "}
-                            {/* Left = further back in history = increment*/}
-                            <button onclick={
-                                () => this.historyDepth = Math.min(this.historyDepth + 1, this.history.runResults.length)
-                            }>&lt;--</button>
-                            {/* Right = more recent in history = decrement*/}
-                            <button onclick={
-                                () => this.historyDepth = Math.max(this.historyDepth - 1, 1)
-                            }>--&gt;</button>
-                        </label>
-                    </div>
-                </div>
+                                <div>
+                                    <form id="saveSessionForm" onsubmit={(e: Event) => {
+                                        let saveFileName = this.saveSessionName;
+                                        e.preventDefault();
+                                        m.request({
+                                            method: "POST",
+                                            url: SERVER_URL + "/save_session",
+                                            body: {fileName: saveFileName},
+                                        }).then(() => console.log("Saved session", saveFileName, "(probably)"));
+                                        this.saveSessionName = undefined;
+                                    }}>
+                                        <label>
+                                            Save current session to file:{" "}
+                                            <input type="text" value={this.saveSessionName} required oninput={(e: InputEvent) =>
+                                                this.saveSessionName = (e.target!! as HTMLInputElement).value
+                                            }/>
+                                        </label>
+                                        <button type="submit">Save</button>
+                                    </form>
+                                    <form id="loadSessionForm" method="POST" onsubmit={(e: Event) => {
+                                        let loadFileName = this.loadSessionName;
+                                        e.preventDefault();
+                                        if (loadFileName) {
+                                            m.request({
+                                                method: "POST",
+                                                url: SERVER_URL + "/load_session",
+                                                body: {fileName: loadFileName},
+                                            })
+                                                .then((history: FuzzHistory) => {
+                                                    console.log("Loaded session", loadFileName);
+                                                    this.history = history;
+                                                    this.resetHistoryDepth();
+                                                })
+                                                .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
+                                            this.loadSessionName = undefined;
+                                        }
+                                    }}>
+                                        <label>
+                                            Load session from file:{" "}
+                                            <select value={this.loadSessionName} onchange={(e: Event) => {
+                                                this.loadSessionName = (e.target!! as HTMLSelectElement).value;
+                                            }}>
+                                                <option value=""/>
+                                                {
+                                                    this.availableLoadSessions?.map((fileName: string) =>
+                                                        <option value={fileName}>{fileName}</option>)
+                                                }
+                                            </select>
+                                        </label>
+                                        <button type="submit">Load</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <br />
                 <table>
+                    <caption style={{textAlign: "left"}}>Generator Data</caption>
                     <tbody>
                     <tr>
                         <td>
