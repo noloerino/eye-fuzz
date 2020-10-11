@@ -127,7 +127,10 @@ private enum class MainThreadTask {
  *
  * Since we only have one server at a time, everything is static. Yay.
  */
-class Server<T>(private val gen: Generator<T>) {
+class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> String) {
+    @Suppress("unused")
+    constructor(gen: Generator<T>) : this(gen, { v -> v.toString() })
+
     /** Tracks the random value stored at an EI, as well as the last line of the stack trace  */
     private val rng = Random()
     internal val genGuidance = EiManualMutateGuidance(rng)
@@ -221,7 +224,7 @@ class Server<T>(private val gen: Generator<T>) {
         val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
         val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
-        genGuidance.fuzzState.genOutput = gen.generate(random, genStatus).toString()
+        genGuidance.fuzzState.genOutput = serializer(gen.generate(random, genStatus))
         println(genGuidance.history.runResults.map { it.serializedResult })
         println("generator produced: " + getGenContents())
     }

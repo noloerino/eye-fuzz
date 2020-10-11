@@ -14,6 +14,7 @@ type ExecutionIndexDisplayAttrs = {
     historyDepth: number;
     historicChoices: Map<ExecutionIndex, number | null>;
     newEiChoices: Map<number, number>;
+    classNameFilter: string;
     showUnused: boolean;
 };
 
@@ -89,7 +90,13 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 textOverflow: "clip",
                                 whiteSpace: "pre-wrap"
                             }}>
-                                {stackTrace.map(serializeStackTraceLine).join("\n")}
+                                {stackTrace
+                                    .filter((l: StackTraceLine) => {
+                                        let targetClass = vnode.attrs.classNameFilter;
+                                        return (l.callLocation.containingClass.indexOf(targetClass) >= 0)
+                                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                                    })
+                                    .map(serializeStackTraceLine).join("\n")}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
@@ -134,8 +141,7 @@ type GenOutputDisplayAttrs = {
 const GEN_CELL_STYLE = {
     maxHeight: "20em",
     maxWidth: "30em",
-    overflow: "scroll",
-    whiteSpace: "nowrap",
+    whiteSpace: "pre-wrap",
     fontSize: 14,
     fontFamily: '"PT Mono", "Courier"'
 };
@@ -161,7 +167,7 @@ class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
                 <table>
                     <thead>
                     <tr>
-                        <th scope="col">Generator Output {vnode.attrs.ago} Runs Ago</th>
+                        <th scope="col">Generator Output {vnode.attrs.ago} Run(s) Ago</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -269,17 +275,11 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             })
                 .then((arr: EiWithData[]) =>
                     arr.map(({ei, eiHash, stackTrace, choice, used}) => {
-                        let targetClass = this.classNameFilter;
-                        let filteredStackTrace: StackTraceLine[] =
-                            stackTrace.filter((l: StackTraceLine) =>
-                                (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                                || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
-                            );
                         return {
                             ei,
                             eiHash,
                             choice,
-                            stackTrace: filteredStackTrace,
+                            stackTrace,
                             used,
                         };
                     }))
@@ -504,11 +504,12 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                    history={this.history}
                                                    historyDepth={this.historyDepth}
                                                    historicChoices={getHistoricChoices(this.history, this.historyDepth)}
-                                                   showUnused={this.showUnused}/>
+                                                   showUnused={this.showUnused}
+                                                   classNameFilter={this.classNameFilter}/>
                         </td>
                         <td>
                             <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
-                                              prevOutput={this.history.runResults[this.history.runResults.length - this.historyDepth - 1]?.result ?? ""}
+                                              prevOutput={this.history.runResults[this.history.runResults.length - this.historyDepth - 1]?.serializedResult?? ""}
                                               ago={this.historyDepth}/>
                         </td>
                     </tr>
