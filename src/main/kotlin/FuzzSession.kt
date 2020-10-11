@@ -24,8 +24,8 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      */
     private val diffStack = mutableListOf(RunResult())
     private val currRunResult: RunResult get() = diffStack.last()
-    var genOutput get() = currRunResult.result
-        set(v) { currRunResult.result = v }
+    var genOutput get() = currRunResult.serializedResult
+        set(v) { currRunResult.serializedResult = v }
 
     // hides mutability of diffs, and remove first sentinel node
     val history: FuzzHistory get() = FuzzHistory(diffStack)
@@ -95,7 +95,7 @@ class RunResult {
     @Serializable
     data class CreateChoice(val ei: SerializableEi, val stackTrace: StackTrace, val new: Int)
 
-    var result: String = ""
+    var serializedResult: String = ""
     private val markedUsed = mutableSetOf<SerializableEi>()
     private val createChoices = mutableListOf<CreateChoice>()
     private val updateChoices = mutableListOf<UpdateChoice>()

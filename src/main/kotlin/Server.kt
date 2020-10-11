@@ -1,4 +1,5 @@
 import com.pholser.junit.quickcheck.generator.GenerationStatus
+import com.pholser.junit.quickcheck.generator.Generator
 import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
@@ -8,7 +9,6 @@ import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.TraceLogger
-import edu.berkeley.cs.jqf.instrument.tracing.events.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -20,122 +20,125 @@ import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 
-/**
- * Manages the HTTP connection to dispatch the generator and fuzzer as needed.
- *
- * Since we only have one server at a time, everything is static. Yay.
- */
-object Server {
-    /** Tracks the random value stored at an EI, as well as the last line of the stack trace  */
-    private val rng = Random()
-    private val genGuidance = EiManualMutateGuidance(rng)
-    private val jsGen = JavaScriptCodeGenerator()
+fun main() {
+    Server<String>(JavaScriptCodeGenerator()).run()
+}
 
-    var mainThread: Thread? = null
+/**
+ * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
+ * yield to the main thread by way of monitors in order to rerun the generator.
+ *
+ * The system is assumed to have a single writer (the main thread), but possibly multiple readers.
+ */
+private enum class MainThreadTask {
+    RERUN_GENERATOR {
+        override fun job(server: Server<*>) {
+            server.dummy()
+        }
+    },
 
     /**
-     * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
-     * yield to the main thread by way of monitors in order to rerun the generator.
-     *
-     * The system is assumed to have a single writer (the main thread), but possibly multiple readers.
+     * This job must be requested within the context provided by genGuidance.reproWithFile.
      */
-    private enum class MainThreadTask {
-        RERUN_GENERATOR {
-            override fun job() {
-                dummy()
-            }
-        },
+    LOAD_FROM_FILE {
+        override fun job(server: Server<*>) {
+            require(server.genGuidance.isInReproMode) { "Repro job was requested outside guidance repro mode"}
+            server.dummy()
+        }
+    }
+    ;
 
-        /**
-         * This job must be requested within the context provided by genGuidance.reproWithFile.
-         */
-        LOAD_FROM_FILE {
-            override fun job() {
-                require(genGuidance.isInReproMode) { "Repro job was requested outside guidance repro mode"}
-                dummy()
+    abstract fun job(server: Server<*>)
+
+    /**
+     * Issues a request for the writer associated with this state to eventually run doWork.
+     * The current thread becomes blocked until the task is completed.
+     */
+    fun requestWork() {
+        log("Issued work request for $this from thread ${Thread.currentThread()}")
+        lock.lock()
+        try {
+            hasTask[this.ordinal] = true
+            taskQ.add(this)
+            writer.signal()
+        } finally {
+            lock.unlock()
+        }
+        // Between the above and below line, it is possible for another invocation for requestWork to slip in
+        // Therefore, we must be maintain a task queue rather than a single state variable
+        lock.lock()
+        try {
+            // The condition readers[i] is associated with the presence of task hasTask[i]
+            // We cannot rely on the queue being empty in case another work request was snuck in
+            // (strictly speaking, we should store ints instead of bools for this reason, but we're assuming
+            // only one request of each kind can be made at a time (which might actually be wrong)
+            while (hasTask[this.ordinal]) {
+                readers[this.ordinal].await()
+            }
+        } finally {
+            lock.unlock()
+        }
+        log("Acknowledged completion of work request for $this on thread ${Thread.currentThread()}")
+    }
+
+    companion object {
+        private var taskQ = mutableListOf<MainThreadTask>()
+        private val lock = ReentrantLock()
+        private val hasTask: MutableList<Boolean> = values().map { false }.toMutableList()
+        private val readers = values().map { lock.newCondition() }
+        private val writer = lock.newCondition()
+
+        private const val verbose = true
+
+        fun log(msg: String) {
+            if (verbose) {
+                println(msg)
             }
         }
-        ;
-
-        abstract fun job()
 
         /**
-         * Issues a request for the writer associated with this state to eventually run doWork.
-         * The current thread becomes blocked until the task is completed.
+         * Causes the current thread to wait until a job is requested (i.e. the writer condition is signalled).
+         * The task is then performed on the main thread, and upon completion, the thread's waiters are signalled.
+         *
+         * Must be called on the writer thread.
+         *
+         * @return the requested task item
          */
-        fun requestWork() {
-            log("Issued work request for $this from thread ${Thread.currentThread()}")
+        fun waitForJob(server: Server<*>) {
+            require(server.mainThread != null) { "Main thread must be initialized" }
+            require(Thread.currentThread() == server.mainThread) { "Jobs must run on the main thread" }
             lock.lock()
             try {
-                hasTask[this.ordinal] = true
-                taskQ.add(this)
-                writer.signal()
+                while (taskQ.isEmpty()) {
+                    writer.await()
+                }
+                val task = taskQ.removeFirst()
+                log("Servicing work request for $task (queue: $taskQ)")
+                hasTask[task.ordinal] = false
+                readers[task.ordinal].signal()
+                task.job(server)
+                log("Completed work request for $task (queue: $taskQ)")
             } finally {
                 lock.unlock()
-            }
-            // Between the above and below line, it is possible for another invocation for requestWork to slip in
-            // Therefore, we must be maintain a task queue rather than a single state variable
-            lock.lock()
-            try {
-                // The condition readers[i] is associated with the presence of task hasTask[i]
-                // We cannot rely on the queue being empty in case another work request was snuck in
-                // (strictly speaking, we should store ints instead of bools for this reason, but we're assuming
-                // only one request of each kind can be made at a time (which might actually be wrong)
-                while (hasTask[this.ordinal]) {
-                    readers[this.ordinal].await()
-                }
-            } finally {
-                lock.unlock()
-            }
-            log("Acknowledged completion of work request for $this on thread ${Thread.currentThread()}")
-        }
-
-        companion object {
-            private var taskQ = mutableListOf<MainThreadTask>()
-            private val lock = ReentrantLock()
-            private val hasTask: MutableList<Boolean> = values().map { false }.toMutableList()
-            private val readers = values().map { lock.newCondition() }
-            private val writer = lock.newCondition()
-
-            private const val verbose = true
-
-            fun log(msg: String) {
-                if (verbose) {
-                    println(msg)
-                }
-            }
-
-            /**
-             * Causes the current thread to wait until a job is requested (i.e. the writer condition is signalled).
-             * The task is then performed on the main thread, and upon completion, the thread's waiters are signalled.
-             *
-             * Must be called on the writer thread.
-             *
-             * @return the requested task item
-             */
-            fun waitForJob() {
-                require(mainThread != null)
-                require(Thread.currentThread() == mainThread) { "Jobs must run on the main thread" }
-                lock.lock()
-                try {
-                    while (taskQ.isEmpty()) {
-                        writer.await()
-                    }
-                    val task = taskQ.removeFirst()
-                    log("Servicing work request for $task (queue: $taskQ)")
-                    hasTask[task.ordinal] = false
-                    readers[task.ordinal].signal()
-                    task.job()
-                    log("Completed work request for $task (queue: $taskQ)")
-                } finally {
-                    lock.unlock()
-                }
             }
         }
     }
+}
 
-    @JvmStatic
-    fun main(args: Array<String>) {
+/**
+ * Manages the HTTP connection to dispatch the generator and fuzzer as needed. The type parameter identifies
+ * the generator and its output type.
+ *
+ * Since we only have one server at a time, everything is static. Yay.
+ */
+class Server<T>(private val gen: Generator<T>) {
+    /** Tracks the random value stored at an EI, as well as the last line of the stack trace  */
+    private val rng = Random()
+    internal val genGuidance = EiManualMutateGuidance(rng)
+
+    var mainThread: Thread? = null
+
+    fun run() {
         init()
         val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
         server.createContext("/ei", object : ResponseHandler("ei") {
@@ -181,7 +184,7 @@ object Server {
         server.start()
         println("Server initialized at port " + server.address.port)
         while (true) {
-            MainThreadTask.waitForJob()
+            MainThreadTask.waitForJob(this)
         }
     }
 
@@ -196,7 +199,7 @@ object Server {
      * Serves as an entry point to the tracking of the EI call stack.
      * Returns should probably stop tracking at runGenerator to avoid an oob exception.
      */
-    private fun dummy() {
+    internal fun dummy() {
         TraceLogger.get().remove()
         val target = Server::class.java.name + "#runGenerator"
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
@@ -222,12 +225,12 @@ object Server {
         val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
         val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
-        genGuidance.fuzzState.genOutput = jsGen.generate(random, genStatus)
-        println(genGuidance.history.runResults.map { it.result })
+        genGuidance.fuzzState.genOutput = gen.generate(random, genStatus).toString()
+        println(genGuidance.history.runResults.map { it.serializedResult })
         println("generator produced: " + getGenContents())
     }
 
-    private class GenHandler : ResponseHandler("generator") {
+    private inner class GenHandler : ResponseHandler("generator") {
         override fun onGet(): String {
             return getGenContents()
         }
@@ -240,20 +243,20 @@ object Server {
         }
     }
 
-    val saveInputDir = File("savedInputs")
+    private val saveInputDir = File("savedInputs")
     init {
         assert(saveInputDir.mkdirs()) { "Unable to create saved input directory at $saveInputDir" }
     }
 
     private fun resolveInputFile(fileName: String): File = saveInputDir.toPath().resolve(fileName).toFile()
 
-    private class SaveInputHandler : ResponseHandler("save_input") {
-        @Serializable
-        private data class SaveRequest(val fileName: String)
+    @Serializable
+    private data class SaveLoadRequest(val fileName: String)
 
+    private inner class SaveInputHandler : ResponseHandler("save_input") {
         override fun onPost(reader: BufferedReader): String {
             val text = reader.readText()
-            val saveRequest = Json.decodeFromString<SaveRequest>(text)
+            val saveRequest = Json.decodeFromString<SaveLoadRequest>(text)
             val saveFile = resolveInputFile(saveRequest.fileName)
             println("Saving last run to ${saveFile.canonicalPath}")
             genGuidance.writeLastRun(saveFile)
@@ -261,10 +264,7 @@ object Server {
         }
     }
 
-    private class LoadInputHandler : ResponseHandler("load_input") {
-        @Serializable
-        private data class LoadRequest(val fileName: String)
-
+    private inner class LoadInputHandler : ResponseHandler("load_input") {
         /**
          * Returns a list of all saved inputs available for repro.
          */
@@ -277,7 +277,7 @@ object Server {
          */
         override fun onPost(reader: BufferedReader): String {
             val text = reader.readText()
-            val loadRequest = Json.decodeFromString<LoadRequest>(text)
+            val loadRequest = Json.decodeFromString<SaveLoadRequest>(text)
             // TODO handle error case i guess
             val loadFile = resolveInputFile(loadRequest.fileName)
             println("Loading run from ${loadFile.canonicalPath}")
@@ -295,13 +295,10 @@ object Server {
 
     private fun resolveSessionFile(fileName: String): File = saveSessionDir.toPath().resolve(fileName).toFile()
 
-    private class SaveSessionHandler : ResponseHandler("save_session") {
-        @Serializable
-        private data class SaveRequest(val fileName: String)
-
+    private inner class SaveSessionHandler : ResponseHandler("save_session") {
         override fun onPost(reader: BufferedReader): String {
             val text = reader.readText()
-            val saveRequest = Json.decodeFromString<SaveRequest>(text)
+            val saveRequest = Json.decodeFromString<SaveLoadRequest>(text)
             val saveFile = resolveSessionFile(saveRequest.fileName)
             println("Saving session history to ${saveFile.canonicalPath}")
             genGuidance.writeSessionHistory(saveFile)
@@ -309,10 +306,7 @@ object Server {
         }
     }
 
-    private class LoadSessionHandler : ResponseHandler("load_session") {
-        @Serializable
-        private data class LoadRequest(val fileName: String)
-
+    private inner class LoadSessionHandler : ResponseHandler("load_session") {
         /**
          * Returns a list of all saved sessions available to load.
          */
@@ -328,7 +322,7 @@ object Server {
          */
         override fun onPost(reader: BufferedReader): String {
             val text = reader.readText()
-            val loadRequest = Json.decodeFromString<LoadRequest>(text)
+            val loadRequest = Json.decodeFromString<SaveLoadRequest>(text)
             val loadFile = resolveSessionFile(loadRequest.fileName)
             println("Loading session history from ${loadFile.canonicalPath}")
             genGuidance.loadSessionHistory(loadFile)
