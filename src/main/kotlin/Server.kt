@@ -20,10 +20,6 @@ import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 
-fun main() {
-    Server<String>(JavaScriptCodeGenerator()).run()
-}
-
 /**
  * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
  * yield to the main thread by way of monitors in order to rerun the generator.
@@ -69,7 +65,7 @@ private enum class MainThreadTask {
         lock.lock()
         try {
             // The condition readers[i] is associated with the presence of task hasTask[i]
-            // We cannot rely on the queue being empty in case another work request was snuck in
+            // We cannot rely on the queue being empty in case another work request was sneaked in
             // (strictly speaking, we should store ints instead of bools for this reason, but we're assuming
             // only one request of each kind can be made at a time (which might actually be wrong)
             while (hasTask[this.ordinal]) {

@@ -132,15 +132,12 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
         when (e) {
             is CallEvent -> {
                 if (e.containingMethodName == "runGenerator") {
-//            if (((CallEvent) e).getInvokedMethodName().equals("Server#dummy()V")) {
                     isTracking = true
                 }
                 val trackedString = if (isTracking) "*tracked" else "untracked"
                 log("CALL $trackedString: $contents")
             }
             is ReturnEvent -> {
-//                if (evString.equals("com/pholser/junit/quickcheck/internal/GeometricDistribution#<init>")) {
-//                if (evString.equals("Server#runGenerator")) {
                 if (contents.contains("Server#runGenerator")) {
                     isTracking = false
                 }
@@ -156,7 +153,6 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
             e.applyVisitor(eiState)
         }
         lastEvent = e
-        //            System.out.println("END VISIT");
     }
 
     /**
