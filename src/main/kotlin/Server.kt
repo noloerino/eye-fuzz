@@ -1,8 +1,6 @@
 import com.pholser.junit.quickcheck.generator.GenerationStatus
 import com.pholser.junit.quickcheck.generator.Generator
 import com.pholser.junit.quickcheck.random.SourceOfRandomness
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
@@ -15,7 +13,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
@@ -328,73 +325,6 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
             MainThreadTask.RERUN_GENERATOR.requestWork()
             return Json.encodeToString(genGuidance.fuzzState.history)
 //            return "OK"
-        }
-    }
-
-    private abstract class ResponseHandler(private val name: String?) : HttpHandler {
-
-        private val verbose = true //false
-
-        override fun handle(httpExchange: HttpExchange) {
-            val method = httpExchange.requestMethod
-            val headers = httpExchange.responseHeaders
-            if (verbose) {
-                println("$method /$name")
-            }
-            headers.add("Access-Control-Allow-Origin", "*")
-            headers.add("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS")
-            headers.add("Access-Control-Allow-Headers", "Access-Control-Allow-Origin,Content-Type")
-            var response = ""
-            fun endResponse() {
-                if (response.isEmpty()) {
-                    httpExchange.sendResponseHeaders(204, -1)
-                } else {
-                    httpExchange.sendResponseHeaders(200, response.length.toLong())
-                }
-            }
-            when (method) {
-                "GET" -> {
-                    response = onGet()
-                    endResponse()
-                }
-                "POST" -> {
-                    BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPost(reader) }
-                    endResponse()
-                }
-                "PATCH" -> {
-                    BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPatch(reader) }
-                    endResponse()
-                }
-                "OPTIONS" -> {
-                    httpExchange.sendResponseHeaders(204, -1)
-                }
-                else -> httpExchange.sendResponseHeaders(501, 0)
-            }
-            httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
-            httpExchange.close()
-        }
-
-        /**
-         * @return the string to be written as a response
-         */
-        open fun onGet(): String {
-            return ""
-        }
-
-        /**
-         * @param reader the request body
-         * @return the string to be written as a response
-         */
-        open fun onPost(reader: BufferedReader): String {
-            return ""
-        }
-
-        /**
-         * @param reader the request body
-         * @return the string to be written as a response
-         */
-        open fun onPatch(reader: BufferedReader): String {
-            return ""
         }
     }
 }
