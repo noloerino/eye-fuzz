@@ -47,7 +47,6 @@ private enum class MainThreadTask {
 
     RUN_TEST_CASE {
         override fun job(server: Server<*>) {
-            server.runTestCase()
         }
     }
     ;
@@ -138,7 +137,9 @@ private enum class MainThreadTask {
 class Server<T>(private val gen: Generator<T>,
                 testClassName: String,
                 private val testMethod: String,
-                private val genOutputSerializer: (T) -> String = { v -> v.toString() }) {
+                private val genOutputSerializer: (T) -> String) {
+    constructor(gen: Generator<T>, testClassName: String, testMethod: String)
+        : this(gen, testClassName, testMethod, { v -> v.toString() })
 
     private val testClass = Class.forName(testClassName)
 
@@ -208,18 +209,14 @@ class Server<T>(private val gen: Generator<T>,
         this.runGenerator()
     }
 
-    private fun startSnoop() {
-        TraceLogger.get().remove()
-        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
-    }
-
     /**
      * Serves as an entry point to the tracking of the EI call stack.
      * Returns should probably stop tracking at generatorStub to avoid an oob exception.
      */
-    fun runGenerator() {
-        startSnoop()
+    internal fun runGenerator() {
+        TraceLogger.get().remove()
+        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
+        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
         genGuidance.reset()
         this.generatorStub()
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
@@ -231,13 +228,14 @@ class Server<T>(private val gen: Generator<T>,
      * See the JQF class, and the way it interacts with the Fuzz annotation.
      */
     fun runTestCase() {
-        startSnoop()
+        TraceLogger.get().remove()
+        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
+        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
         val testRunner = TrialRunner(
                 testClass,
                 // TODO generalize by saving current obj rather than serialized
                 FrameworkMethod(testClass.getMethod(testMethod, String::class.java)),
-                arrayOf(genGuidance.fuzzState.genOutput)
-        )
+                arrayOf(genGuidance.fuzzState.genOutput))
         SingleSnoop.startSnooping(testClass.name.toString() + "#" + testMethod)
         println("Starting test case run")
         val junit = JUnitCore()

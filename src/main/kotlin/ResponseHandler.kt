@@ -2,6 +2,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import kotlin.system.exitProcess
 
 abstract class ResponseHandler(private val name: String?) : HttpHandler {
 
@@ -45,8 +46,10 @@ abstract class ResponseHandler(private val name: String?) : HttpHandler {
             }
             httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
         } catch (e: Exception) {
+            System.err.println("Exception in handling $method /$name")
             e.printStackTrace()
             httpExchange.sendResponseHeaders(503, 0)
+            exitProcess(1)
         } finally {
             httpExchange.close()
         }
