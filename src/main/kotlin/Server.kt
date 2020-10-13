@@ -26,7 +26,7 @@ import java.util.concurrent.locks.ReentrantLock
 private enum class MainThreadTask {
     RERUN_GENERATOR {
         override fun job(server: Server<*>) {
-            server.dummy()
+            server.runGenerator()
         }
     },
 
@@ -36,7 +36,13 @@ private enum class MainThreadTask {
     LOAD_FROM_FILE {
         override fun job(server: Server<*>) {
             require(server.genGuidance.isInReproMode) { "Repro job was requested outside guidance repro mode"}
-            server.dummy()
+            server.runGenerator()
+        }
+    },
+
+    RUN_TEST_CASE {
+        override fun job(server: Server<*>) {
+            TODO("Not yet implemented")
         }
     }
     ;
@@ -188,20 +194,19 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
         mainThread = Thread.currentThread()
         System.setProperty("jqf.traceGenerators", "true")
         // Needed for some jank call tracking
-        dummy()
+        this.runGenerator()
     }
 
     /**
      * Serves as an entry point to the tracking of the EI call stack.
      * Returns should probably stop tracking at runGenerator to avoid an oob exception.
      */
-    internal fun dummy() {
+    internal fun runGenerator() {
         TraceLogger.get().remove()
-        val target = Server::class.java.name + "#runGenerator"
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(target)
+        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
         genGuidance.reset()
-        runGenerator()
+        this.generatorStub()
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
@@ -217,7 +222,7 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
      * See Zest fuzzing loop.
      * https://github.com/rohanpadhye/JQF/blob/0152e82d4eb414b06438dec3ef0322135318291a/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java#L159
      */
-    private fun runGenerator() {
+    private fun generatorStub() {
         val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
         val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
@@ -326,5 +331,10 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
             return Json.encodeToString(genGuidance.fuzzState.history)
 //            return "OK"
         }
+    }
+
+    companion object {
+        const val GEN_STUB_METHOD = "generatorStub"
+        val GEN_STUB_FULL_NAME = "${Server::class.java.name}#$GEN_STUB_METHOD"
     }
 }

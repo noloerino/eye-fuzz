@@ -131,14 +131,14 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
         //            System.out.println("BEGIN VISIT");
         when (e) {
             is CallEvent -> {
-                if (e.containingMethodName == "runGenerator") {
+                if (e.containingMethodName == Server.GEN_STUB_METHOD) {
                     isTracking = true
                 }
                 val trackedString = if (isTracking) "*tracked" else "untracked"
                 log("CALL $trackedString: $contents")
             }
             is ReturnEvent -> {
-                if (contents.contains("Server#runGenerator")) {
+                if (contents.contains(Server.GEN_STUB_FULL_NAME)) {
                     isTracking = false
                 }
                 val trackedString = if (isTracking) "*tracked" else "untracked"

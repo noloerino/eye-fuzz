@@ -24,26 +24,32 @@ abstract class ResponseHandler(private val name: String?) : HttpHandler {
                 httpExchange.sendResponseHeaders(200, response.length.toLong())
             }
         }
-        when (method) {
-            "GET" -> {
-                response = onGet()
-                endResponse()
+        try {
+            when (method) {
+                "GET" -> {
+                    response = onGet()
+                    endResponse()
+                }
+                "POST" -> {
+                    BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPost(reader) }
+                    endResponse()
+                }
+                "PATCH" -> {
+                    BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPatch(reader) }
+                    endResponse()
+                }
+                "OPTIONS" -> {
+                    httpExchange.sendResponseHeaders(204, -1)
+                }
+                else -> httpExchange.sendResponseHeaders(501, 0)
             }
-            "POST" -> {
-                BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPost(reader) }
-                endResponse()
-            }
-            "PATCH" -> {
-                BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPatch(reader) }
-                endResponse()
-            }
-            "OPTIONS" -> {
-                httpExchange.sendResponseHeaders(204, -1)
-            }
-            else -> httpExchange.sendResponseHeaders(501, 0)
+            httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            httpExchange.sendResponseHeaders(503, 0)
+        } finally {
+            httpExchange.close()
         }
-        httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
-        httpExchange.close()
     }
 
     /**
