@@ -3,6 +3,7 @@ import com.pholser.junit.quickcheck.generator.Generator
 import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import com.sun.net.httpserver.HttpServer
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
+import edu.berkeley.cs.jqf.fuzz.junit.TrialRunner
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
@@ -11,11 +12,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.junit.runner.JUnitCore
+import org.junit.runner.Result
+import org.junit.runners.model.FrameworkMethod
 import java.io.BufferedReader
 import java.io.File
 import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
+
 
 /**
  * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
@@ -42,7 +47,7 @@ private enum class MainThreadTask {
 
     RUN_TEST_CASE {
         override fun job(server: Server<*>) {
-            TODO("Not yet implemented")
+            server.runTestCase()
         }
     }
     ;
@@ -130,17 +135,23 @@ private enum class MainThreadTask {
  *
  * Since we only have one server at a time, everything is static. Yay.
  */
-class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> String) {
-    @Suppress("unused")
-    constructor(gen: Generator<T>) : this(gen, { v -> v.toString() })
+class Server<T>(private val gen: Generator<T>,
+                testClassName: String,
+                private val testMethod: String,
+                private val genOutputSerializer: (T) -> String = { v -> v.toString() }) {
+
+    private val testClass = Class.forName(testClassName)
 
     /** Tracks the random value stored at an EI, as well as the last line of the stack trace  */
     private val rng = Random()
     internal val genGuidance = EiManualMutateGuidance(rng)
 
+    /** The result of the last test case run */
+    var testResult: Result? = null
+
     var mainThread: Thread? = null
 
-    fun run() {
+    fun start() {
         init()
         val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
         server.createContext("/ei", object : ResponseHandler("ei") {
@@ -183,6 +194,7 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
         server.createContext("/save_session", SaveSessionHandler())
         server.createContext("/load_session", LoadSessionHandler())
         server.createContext("/generator", GenHandler())
+        server.createContext("/run_test", RunTestHandler())
         server.start()
         println("Server initialized at port " + server.address.port)
         while (true) {
@@ -193,21 +205,45 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
     private fun init() {
         mainThread = Thread.currentThread()
         System.setProperty("jqf.traceGenerators", "true")
-        // Needed for some jank call tracking
         this.runGenerator()
+    }
+
+    private fun startSnoop() {
+        TraceLogger.get().remove()
+        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
+        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
     }
 
     /**
      * Serves as an entry point to the tracking of the EI call stack.
-     * Returns should probably stop tracking at runGenerator to avoid an oob exception.
+     * Returns should probably stop tracking at generatorStub to avoid an oob exception.
      */
-    internal fun runGenerator() {
-        TraceLogger.get().remove()
-        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
+    fun runGenerator() {
+        startSnoop()
         genGuidance.reset()
         this.generatorStub()
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
+    }
+
+    /**
+     * Runs a test case and obtains coverage for it.
+     *
+     * See the JQF class, and the way it interacts with the Fuzz annotation.
+     */
+    fun runTestCase() {
+        startSnoop()
+        val testRunner = TrialRunner(
+                testClass,
+                // TODO generalize by saving current obj rather than serialized
+                FrameworkMethod(testClass.getMethod(testMethod, String::class.java)),
+                arrayOf(genGuidance.fuzzState.genOutput)
+        )
+        SingleSnoop.startSnooping(testClass.name.toString() + "#" + testMethod)
+        println("Starting test case run")
+        val junit = JUnitCore()
+        testResult = junit.run(testRunner)
+        println("Finished test case run")
+        // TODO set guidance
     }
 
     private fun getGenContents(): String {
@@ -217,7 +253,7 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
 
     /**
      * Reruns the generator to update the generator string.
-     * NOT ACTUALLY THE ENTRY POINT - USE dummy INSTEAD
+     * NOT ACTUALLY THE ENTRY POINT - USE runGenerator INSTEAD
      *
      * See Zest fuzzing loop.
      * https://github.com/rohanpadhye/JQF/blob/0152e82d4eb414b06438dec3ef0322135318291a/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java#L159
@@ -226,10 +262,20 @@ class Server<T>(private val gen: Generator<T>, private val serializer: (T) -> St
         val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
         val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
-        genGuidance.fuzzState.genOutput = serializer(gen.generate(random, genStatus))
+        genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
         println(genGuidance.history.runResults.map { it.serializedResult })
         println("generator produced: " + getGenContents())
     }
+
+    // ===================== TEST CASE API STUFF =====================
+    private inner class RunTestHandler : ResponseHandler("run_test") {
+        override fun onPost(reader: BufferedReader): String {
+            MainThreadTask.RUN_TEST_CASE.requestWork()
+            return testResult.toString()
+        }
+    }
+
+    // ===================== GENERATOR API STUFF =====================
 
     private inner class GenHandler : ResponseHandler("generator") {
         override fun onGet(): String {

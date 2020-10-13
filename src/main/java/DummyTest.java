@@ -40,8 +40,11 @@ public class DummyTest {
         return result;
     }
 
+    static String generated = "";
+
     @Fuzz
     public void testWithGenerator(@From(JavaScriptCodeGenerator.class) String code) {
+        generated = code;
         SourceFile input = SourceFile.fromCode("input", code);
         compile(input);
     }
