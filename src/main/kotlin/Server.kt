@@ -292,13 +292,20 @@ class Server<T>(private val gen: Generator<T>,
 
     // ===================== TEST CASE API STUFF =====================
     private inner class RunTestHandler : ResponseHandler("run_test") {
+        override fun onGet(): String {
+            return Json.encodeToString(TestCovResult(
+                    lastTestResult,
+                    genGuidance.lastRunTestCov.toSet().map { EiManualMutateGuidance.eventToString(it) }
+            ))
+        }
+
         override fun onPost(reader: BufferedReader): String {
             genGuidance.collectTestCov().use {
                 MainThreadTask.RUN_TEST_CASE.requestWork()
             }
             return Json.encodeToString(TestCovResult(
                     lastTestResult,
-                    genGuidance.lastRunTestCov.map { EiManualMutateGuidance.eventToString(it) }
+                    genGuidance.lastRunTestCov.toSet().map { EiManualMutateGuidance.eventToString(it) }
             ))
         }
     }
