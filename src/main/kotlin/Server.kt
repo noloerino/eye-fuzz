@@ -215,7 +215,7 @@ class Server<T>(private val gen: Generator<T>,
     internal fun runGenerator() {
         TraceLogger.get().remove()
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
+        SingleSnoop.startSnooping(GUIDANCE_STUB_FULL_NAME)
         genGuidance.reset()
         println("Starting generator run (entp: ${SingleSnoop.entryPoints})")
         this.guidanceStub(true)
@@ -230,7 +230,7 @@ class Server<T>(private val gen: Generator<T>,
     fun runTestCase() {
         TraceLogger.get().remove()
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
+        SingleSnoop.startSnooping(GUIDANCE_STUB_FULL_NAME)
         println("Starting test case run (entp: ${SingleSnoop.entryPoints})")
         this.guidanceStub(false)
         println("Finished test case run")
@@ -246,8 +246,10 @@ class Server<T>(private val gen: Generator<T>,
      *
      * This weird coalescing into a single method is necessary to ensure that both methods can use the same entry point,
      * as SingleSnoop seems to be unhappy otherwise.
+     * I verified this behavior by invoking runTest and runGenerator in sequence upon initialization of the server,
+     * and found that coverage would be collected only for the first of the two.
      *
-     * TODO refactor to account for boolean blindness
+     * TODO refactor argument to account for boolean blindness
      */
     private fun guidanceStub(runGen: Boolean) {
         if (runGen) {
@@ -384,7 +386,7 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     companion object {
-        const val GEN_STUB_METHOD = "guidanceStub"
-        val GEN_STUB_FULL_NAME = "${Server::class.java.name}#$GEN_STUB_METHOD"
+        const val GUIDANCE_STUB_METHOD = "guidanceStub"
+        val GUIDANCE_STUB_FULL_NAME = "${Server::class.java.name}#$GUIDANCE_STUB_METHOD"
     }
 }

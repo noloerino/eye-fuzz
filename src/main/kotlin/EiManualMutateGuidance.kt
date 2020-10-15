@@ -154,14 +154,14 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
         val contents = eventToString(e)
         when (e) {
             is CallEvent -> {
-                if (e.containingMethodName == Server.GEN_STUB_METHOD) {
+                if (e.containingMethodName == Server.GUIDANCE_STUB_METHOD) {
                     isTracking = true
                 }
                 val trackedString = if (isTracking) "*tracked" else "untracked"
                 log("CALL $trackedString: $contents")
             }
             is ReturnEvent -> {
-                if (contents.contains(Server.GEN_STUB_FULL_NAME)) {
+                if (contents.contains(Server.GUIDANCE_STUB_FULL_NAME)) {
                     isTracking = false
                 }
                 val trackedString = if (isTracking) "*tracked" else "untracked"
