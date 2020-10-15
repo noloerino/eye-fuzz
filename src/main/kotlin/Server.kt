@@ -286,9 +286,11 @@ class Server<T>(private val gen: Generator<T>,
                     edu.berkeley.cs.jqf.fuzz.guidance.Result.FAILURE
                 }
             }
-            println("test status: $result")
+            lastTestResult = result
         }
     }
+
+    private var lastTestResult: edu.berkeley.cs.jqf.fuzz.guidance.Result = edu.berkeley.cs.jqf.fuzz.guidance.Result.SUCCESS
 
     // ===================== TEST CASE API STUFF =====================
     private inner class RunTestHandler : ResponseHandler("run_test") {
@@ -296,7 +298,10 @@ class Server<T>(private val gen: Generator<T>,
             genGuidance.collectTestCov().use {
                 MainThreadTask.RUN_TEST_CASE.requestWork()
             }
-            return testResult.toString()
+            return Json.encodeToString(TestCovResult(
+                    lastTestResult,
+                    genGuidance.lastRunTestCov.map { EiManualMutateGuidance.eventToString(it) }
+            ))
         }
     }
 

@@ -57,5 +57,4 @@ object ExecutionIndexSerializer : KSerializer<ExecutionIndex> {
         // for serialization purposes
         ListSerializer(Int.serializer()).serialize(encoder, arr)
     }
-
 }
