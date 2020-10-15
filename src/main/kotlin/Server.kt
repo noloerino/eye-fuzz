@@ -2,7 +2,9 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus
 import com.pholser.junit.quickcheck.generator.Generator
 import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import com.sun.net.httpserver.HttpServer
+import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
+import edu.berkeley.cs.jqf.fuzz.guidance.TimeoutException
 import edu.berkeley.cs.jqf.fuzz.junit.TrialRunner
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
@@ -12,6 +14,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.junit.AssumptionViolatedException
 import org.junit.runner.JUnitCore
 import org.junit.runner.Result
 import org.junit.runners.model.FrameworkMethod
@@ -20,7 +23,6 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
-
 
 /**
  * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
@@ -262,13 +264,29 @@ class Server<T>(private val gen: Generator<T>,
             println(genGuidance.history.runResults.map { it.serializedResult })
             println("generator produced: " + getGenContents())
         } else {
-            val testRunner = TrialRunner(
-                    testClass,
-                    // TODO generalize by saving current obj rather than serialized string
-                    FrameworkMethod(testClass.getMethod(testMethod, String::class.java)),
-                    arrayOf(genGuidance.fuzzState.genOutput))
-            val junit = JUnitCore()
-            testResult = junit.run(testRunner)
+            // TODO generalize by saving current obj rather than serialized string
+            val method = FrameworkMethod(testClass.getMethod(testMethod, String::class.java))
+            val testRunner = TrialRunner(testClass, method, arrayOf(genGuidance.fuzzState.genOutput))
+            // Handle exceptions (see FuzzStatement)
+            // https://github.com/rohanpadhye/JQF/blob/master/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java
+            val expectedExceptions = method.method.exceptionTypes
+            val result: edu.berkeley.cs.jqf.fuzz.guidance.Result = try {
+                testRunner.run()
+                edu.berkeley.cs.jqf.fuzz.guidance.Result.SUCCESS
+            } catch (e: AssumptionViolatedException) {
+                edu.berkeley.cs.jqf.fuzz.guidance.Result.INVALID
+            } catch (e: TimeoutException) {
+                edu.berkeley.cs.jqf.fuzz.guidance.Result.TIMEOUT
+            } catch (e: GuidanceException) {
+                throw e // Propagate error so we can quit
+            } catch (t: Throwable) {
+                if (expectedExceptions.any { it.isAssignableFrom(t::class.java) }) {
+                    edu.berkeley.cs.jqf.fuzz.guidance.Result.SUCCESS
+                } else {
+                    edu.berkeley.cs.jqf.fuzz.guidance.Result.FAILURE
+                }
+            }
+            println("test status: $result")
         }
     }
 
