@@ -2,6 +2,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus
 import com.pholser.junit.quickcheck.generator.Generator
 import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import com.sun.net.httpserver.HttpServer
+import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.guidance.TimeoutException
@@ -15,8 +16,6 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.AssumptionViolatedException
-import org.junit.runner.JUnitCore
-import org.junit.runner.Result
 import org.junit.runners.model.FrameworkMethod
 import java.io.BufferedReader
 import java.io.File
@@ -111,7 +110,6 @@ private enum class MainThreadTask {
          * @return the requested task item
          */
         fun waitForJob(server: Server<*>) {
-            require(server.mainThread != null) { "Main thread must be initialized" }
             require(Thread.currentThread() == server.mainThread) { "Jobs must run on the main thread" }
             lock.lock()
             try {
@@ -154,7 +152,7 @@ class Server<T>(private val gen: Generator<T>,
     internal val genGuidance = EiManualMutateGuidance(rng, mainThread)
 
     /** The result of the last test case run */
-    var testResult: Result? = null
+    var testResult: org.junit.runner.Result? = null
 
     fun start() {
         init()
@@ -270,27 +268,27 @@ class Server<T>(private val gen: Generator<T>,
             // Handle exceptions (see FuzzStatement)
             // https://github.com/rohanpadhye/JQF/blob/master/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java
             val expectedExceptions = method.method.exceptionTypes
-            val result: edu.berkeley.cs.jqf.fuzz.guidance.Result = try {
+            val result: Result = try {
                 testRunner.run()
-                edu.berkeley.cs.jqf.fuzz.guidance.Result.SUCCESS
+                Result.SUCCESS
             } catch (e: AssumptionViolatedException) {
-                edu.berkeley.cs.jqf.fuzz.guidance.Result.INVALID
+                Result.INVALID
             } catch (e: TimeoutException) {
-                edu.berkeley.cs.jqf.fuzz.guidance.Result.TIMEOUT
+                Result.TIMEOUT
             } catch (e: GuidanceException) {
                 throw e // Propagate error so we can quit
             } catch (t: Throwable) {
                 if (expectedExceptions.any { it.isAssignableFrom(t::class.java) }) {
-                    edu.berkeley.cs.jqf.fuzz.guidance.Result.SUCCESS
+                    Result.SUCCESS
                 } else {
-                    edu.berkeley.cs.jqf.fuzz.guidance.Result.FAILURE
+                    Result.FAILURE
                 }
             }
             lastTestResult = result
         }
     }
 
-    private var lastTestResult: edu.berkeley.cs.jqf.fuzz.guidance.Result = edu.berkeley.cs.jqf.fuzz.guidance.Result.SUCCESS
+    private var lastTestResult: Result = Result.SUCCESS
 
     // ===================== TEST CASE API STUFF =====================
     private inner class RunTestHandler : ResponseHandler("run_test") {
