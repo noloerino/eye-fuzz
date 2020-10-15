@@ -53,7 +53,7 @@ public class EiState implements TraceEventVisitor {
             stackOfCounters.get(depth).clear();
         } catch (ArrayIndexOutOfBoundsException ex) {
             String evString = e.getContainingClass() + "#" + e.getContainingMethodName();
-            System.out.println("OOB FOR EVENT " + evString + "; DEPTH " + depth);
+            System.out.println("OOB FOR RETURN EVENT " + evString + "; DEPTH " + depth);
             throw ex;
         }
         // Decrement depth

@@ -47,6 +47,7 @@ private enum class MainThreadTask {
 
     RUN_TEST_CASE {
         override fun job(server: Server<*>) {
+            server.runTestCase()
         }
     }
     ;
@@ -142,15 +143,14 @@ class Server<T>(private val gen: Generator<T>,
         : this(gen, testClassName, testMethod, { v -> v.toString() })
 
     private val testClass = Class.forName(testClassName)
+    val mainThread: Thread = Thread.currentThread()
 
     /** Tracks the random value stored at an EI, as well as the last line of the stack trace  */
     private val rng = Random()
-    internal val genGuidance = EiManualMutateGuidance(rng)
+    internal val genGuidance = EiManualMutateGuidance(rng, mainThread)
 
     /** The result of the last test case run */
     var testResult: Result? = null
-
-    var mainThread: Thread? = null
 
     fun start() {
         init()
@@ -204,7 +204,6 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     private fun init() {
-        mainThread = Thread.currentThread()
         System.setProperty("jqf.traceGenerators", "true")
         this.runGenerator()
     }
@@ -218,7 +217,8 @@ class Server<T>(private val gen: Generator<T>,
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
         SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
         genGuidance.reset()
-        this.generatorStub()
+        println("Starting generator run (entp: ${SingleSnoop.entryPoints})")
+        this.guidanceStub(true)
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
@@ -231,17 +231,9 @@ class Server<T>(private val gen: Generator<T>,
         TraceLogger.get().remove()
         SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
         SingleSnoop.startSnooping(GEN_STUB_FULL_NAME)
-        val testRunner = TrialRunner(
-                testClass,
-                // TODO generalize by saving current obj rather than serialized
-                FrameworkMethod(testClass.getMethod(testMethod, String::class.java)),
-                arrayOf(genGuidance.fuzzState.genOutput))
-        SingleSnoop.startSnooping(testClass.name.toString() + "#" + testMethod)
-        println("Starting test case run")
-        val junit = JUnitCore()
-        testResult = junit.run(testRunner)
+        println("Starting test case run (entp: ${SingleSnoop.entryPoints})")
+        this.guidanceStub(false)
         println("Finished test case run")
-        // TODO set guidance
     }
 
     private fun getGenContents(): String {
@@ -250,25 +242,39 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     /**
-     * Reruns the generator to update the generator string.
-     * NOT ACTUALLY THE ENTRY POINT - USE runGenerator INSTEAD
+     * @param runGen if true, then reruns the generator; if false, then collects coverage data
      *
-     * See Zest fuzzing loop.
-     * https://github.com/rohanpadhye/JQF/blob/0152e82d4eb414b06438dec3ef0322135318291a/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java#L159
+     * This weird coalescing into a single method is necessary to ensure that both methods can use the same entry point,
+     * as SingleSnoop seems to be unhappy otherwise.
+     *
+     * TODO refactor to account for boolean blindness
      */
-    private fun generatorStub() {
-        val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
-        val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
-        val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
-        genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
-        println(genGuidance.history.runResults.map { it.serializedResult })
-        println("generator produced: " + getGenContents())
+    private fun guidanceStub(runGen: Boolean) {
+        if (runGen) {
+            val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
+            val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
+            val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
+            genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
+            println(genGuidance.history.runResults.map { it.serializedResult })
+            println("generator produced: " + getGenContents())
+        } else {
+            val testRunner = TrialRunner(
+                    testClass,
+                    // TODO generalize by saving current obj rather than serialized string
+                    FrameworkMethod(testClass.getMethod(testMethod, String::class.java)),
+                    arrayOf(genGuidance.fuzzState.genOutput))
+            SingleSnoop.startSnooping(testClass.name.toString() + "#" + testMethod)
+            val junit = JUnitCore()
+            testResult = junit.run(testRunner)
+        }
     }
 
     // ===================== TEST CASE API STUFF =====================
     private inner class RunTestHandler : ResponseHandler("run_test") {
         override fun onPost(reader: BufferedReader): String {
-            MainThreadTask.RUN_TEST_CASE.requestWork()
+            genGuidance.collectTestCov().use {
+                MainThreadTask.RUN_TEST_CASE.requestWork()
+            }
             return testResult.toString()
         }
     }
@@ -378,7 +384,7 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     companion object {
-        const val GEN_STUB_METHOD = "generatorStub"
+        const val GEN_STUB_METHOD = "guidanceStub"
         val GEN_STUB_FULL_NAME = "${Server::class.java.name}#$GEN_STUB_METHOD"
     }
 }

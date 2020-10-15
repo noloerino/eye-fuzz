@@ -44,6 +44,7 @@ public class DummyTest {
 
     @Fuzz
     public void testWithGenerator(@From(JavaScriptCodeGenerator.class) String code) {
+        System.out.println("Test is running on thread " + Thread.currentThread());
         generated = code;
         SourceFile input = SourceFile.fromCode("input", code);
         compile(input);

@@ -14,15 +14,25 @@ import java.util.*
 import java.util.function.Consumer
 import kotlin.collections.LinkedHashMap
 
+enum class GuidanceMode {
+    GENERATE_INPUT,
+    REPRO_FILE,
+    COLLECT_COV,
+}
+
 /**
- * Analogous to a ExecutionIndexGuidance, but is backed by the above eiMap.
- * Needs to record coverage for EI to work.
- * Run only once.
+ * A more transparent version of ExecutionIndexingGuidance that also doubles as a repro guidance and also a collector
+ * of test coverage, because there's some funky thread stuff going on.
  */
-class EiManualMutateGuidance(rng: Random) : Guidance {
-    private var appThread: Thread? = null // Ensures only one thread
+class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guidance {
     private var lastEvent: TraceEvent? = null
-    private var eiState = EiState()
+    /** The EI stack trace for generator runs */
+    private var genEiState = EiState()
+    /** The EI stack trace for test coverage runs */
+    private var collectEiState = EiState()
+
+    private var mode = GuidanceMode.GENERATE_INPUT
+
     private var hasRun = false
 
     val fuzzState = FuzzState(this, rng)
@@ -43,7 +53,8 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
      */
     var reproValues: Iterator<Int>? = null
 
-    val isInReproMode: Boolean get() = reproValues != null
+    val isInReproMode: Boolean get() = mode == GuidanceMode.REPRO_FILE
+    val isInCollectMode: Boolean get() = mode == GuidanceMode.COLLECT_COV
 
     /**
      * Sets the guidance to read input bytes from the provided file. This automatically calls `reset` to start
@@ -54,6 +65,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
      */
     fun reproWithFile(file: File): Closeable {
         this.reset()
+        mode = GuidanceMode.REPRO_FILE
         reproBackupEiMap = fuzzState.eiMap
         fuzzState.eiMap = linkedMapOf()
         reproValues = file.readBytes().asSequence().map { it.toInt() and 0xFF }.iterator()
@@ -63,11 +75,23 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
             fuzzState.eiMap = reproBackupEiMap!!
             reproBackupEiMap = null
             reproValues = null
+            mode = GuidanceMode.GENERATE_INPUT
+        }
+    }
+
+    /**
+     * Sets the guidance to do nothing but collect test coverage; no inputs should ever be generated in this mode.
+     */
+    fun collectTestCov(): Closeable {
+        collectEiState = EiState()
+        mode = GuidanceMode.COLLECT_COV
+        return Closeable {
+            mode = GuidanceMode.GENERATE_INPUT
         }
     }
 
     fun reset() {
-        eiState = EiState()
+        genEiState = EiState()
         hasRun = false
         fuzzState.resetForNewRun()
     }
@@ -76,9 +100,9 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
      * the full stack trace of the current EI state
      * should be invoked after getExecutionIndex was called on lastEvent
      */
-    fun getFullStackTrace(): List<StackTraceLine> = (0 until eiState.depth + 1).map { i ->
-        val iid = eiState.rollingIndex[2 * i]
-        val count = eiState.rollingIndex[2 * i + 1]
+    fun getFullStackTrace(): List<StackTraceLine> = (0 until genEiState.depth + 1).map { i ->
+        val iid = genEiState.rollingIndex[2 * i]
+        val count = genEiState.rollingIndex[2 * i + 1]
         val callLocation = callLocations[iid]!!
         StackTraceLine(callLocation, count)
     }
@@ -94,8 +118,9 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
                 if (lastEvent == null) {
                     throw GuidanceException("Could not compute execution index; no instrumentation?")
                 }
+                check(!isInCollectMode) { "Illegal attempt to request bytes while in coverage collection mode" }
                 // Get the execution index of the last event
-                val executionIndex = eiState.getExecutionIndex(lastEvent!!)
+                val executionIndex = genEiState.getExecutionIndex(lastEvent!!)
                 log("\tREAD " + eventToString(lastEvent!!))
                 return fuzzState.add(executionIndex)
             }
@@ -112,8 +137,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     }
 
     override fun generateCallBack(thread: Thread): Consumer<TraceEvent> {
-        check(appThread == null || appThread == thread) { "Guidance must stay on the same thread" }
-        appThread = thread
+        require(appThread == thread) { "Guidance must stay on the same thread" }
         SingleSnoop.entryPoints[thread] ?: throw IllegalStateException("Guidance must be able to determine entry point")
         return Consumer { e: TraceEvent -> handleEvent(e) }
     }
@@ -128,7 +152,6 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     private fun handleEvent(e: TraceEvent) {
         // Needed to cache stack traces
         val contents = eventToString(e)
-        //            System.out.println("BEGIN VISIT");
         when (e) {
             is CallEvent -> {
                 if (e.containingMethodName == Server.GEN_STUB_METHOD) {
@@ -150,7 +173,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
             }
         }
         if (isTracking) {
-            e.applyVisitor(eiState)
+            e.applyVisitor(if (isInCollectMode) { collectEiState } else { genEiState })
         }
         lastEvent = e
     }

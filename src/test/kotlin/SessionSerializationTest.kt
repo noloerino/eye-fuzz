@@ -15,7 +15,7 @@ class SessionSerializationTest {
 
     @Test
     fun testEncodeDecode() {
-        val state = EiManualMutateGuidance(rng.asJavaRandom()).fuzzState
+        val state = EiManualMutateGuidance(rng.asJavaRandom(), Thread.currentThread()).fuzzState
         // Mock 3-6 iterations of fuzzing
         val eis = mutableSetOf<ExecutionIndex>()
         (0..(max(3 + rng.nextInt(3), eis.size))).forEach { _ ->
