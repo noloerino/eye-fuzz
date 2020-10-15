@@ -30,6 +30,7 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
     private var genEiState = EiState()
     /** The EI stack trace for test coverage runs */
     private var collectEiState = EiState()
+    val lastRunTestCov = mutableSetOf<TraceEvent>()
 
     private var mode = GuidanceMode.GENERATE_INPUT
 
@@ -84,6 +85,7 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
      */
     fun collectTestCov(): Closeable {
         collectEiState = EiState()
+        lastRunTestCov.clear()
         mode = GuidanceMode.COLLECT_COV
         return Closeable {
             mode = GuidanceMode.GENERATE_INPUT
@@ -132,7 +134,6 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
     }
 
     override fun handleResult(result: Result, throwable: Throwable) {
-//        System.out.println("\tHANDLE RESULT");
         hasRun = true
     }
 
@@ -174,6 +175,9 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
         }
         if (isTracking) {
             e.applyVisitor(if (isInCollectMode) { collectEiState } else { genEiState })
+            if (isInCollectMode) {
+                lastRunTestCov.add(e)
+            }
         }
         lastEvent = e
     }

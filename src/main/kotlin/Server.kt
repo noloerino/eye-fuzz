@@ -139,6 +139,8 @@ class Server<T>(private val gen: Generator<T>,
                 testClassName: String,
                 private val testMethod: String,
                 private val genOutputSerializer: (T) -> String) {
+    // WARNING: REMOVING THIS CONSTRUCTOR AND PASSING toString AS A DEFAULT ARGUMENT WILL BREAK EI TRACKING
+    // FOR SOME DUMB REASON
     constructor(gen: Generator<T>, testClassName: String, testMethod: String)
         : this(gen, testClassName, testMethod, { v -> v.toString() })
 
@@ -265,7 +267,6 @@ class Server<T>(private val gen: Generator<T>,
                     // TODO generalize by saving current obj rather than serialized string
                     FrameworkMethod(testClass.getMethod(testMethod, String::class.java)),
                     arrayOf(genGuidance.fuzzState.genOutput))
-            SingleSnoop.startSnooping(testClass.name.toString() + "#" + testMethod)
             val junit = JUnitCore()
             testResult = junit.run(testRunner)
         }
