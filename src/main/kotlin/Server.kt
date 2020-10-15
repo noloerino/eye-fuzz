@@ -243,6 +243,16 @@ class Server<T>(private val gen: Generator<T>,
         return genContents.substring(0, genContents.length.coerceAtMost(1024))
     }
 
+    private fun getTestCaseCov(): TestCovResult {
+        return TestCovResult(
+            lastTestResult,
+            // Need to filter to ensure size not too large
+            genGuidance.lastRunTestCov.toSet()
+                    .map { EiManualMutateGuidance.eventToString(it) }
+                    .filter { it.contains(testClass.name) }
+        )
+    }
+
     /**
      * @param runGen if true, then reruns the generator; if false, then collects coverage data
      *
@@ -293,20 +303,14 @@ class Server<T>(private val gen: Generator<T>,
     // ===================== TEST CASE API STUFF =====================
     private inner class RunTestHandler : ResponseHandler("run_test") {
         override fun onGet(): String {
-            return Json.encodeToString(TestCovResult(
-                    lastTestResult,
-                    genGuidance.lastRunTestCov.toSet().map { EiManualMutateGuidance.eventToString(it) }
-            ))
+            return Json.encodeToString(getTestCaseCov())
         }
 
         override fun onPost(reader: BufferedReader): String {
             genGuidance.collectTestCov().use {
                 MainThreadTask.RUN_TEST_CASE.requestWork()
             }
-            return Json.encodeToString(TestCovResult(
-                    lastTestResult,
-                    genGuidance.lastRunTestCov.toSet().map { EiManualMutateGuidance.eventToString(it) }
-            ))
+            return Json.encodeToString(getTestCaseCov())
         }
     }
 

@@ -188,6 +188,23 @@ type RunInfo = {
     genOutput: string;
 };
 
+enum TestStatus {
+    SUCCESS = "SUCCESS",
+    TIMEOUT = "TIMEOUT",
+    FAILURE = "FAILURE",
+    INVALID = "INVALID"
+}
+
+type TestCov = {
+    status: TestStatus;
+    events: string[];
+};
+
+enum ActiveTab {
+    EI,
+    COV
+}
+
 export class RootTable extends MithrilTsxComponent<{ }> {
     history: FuzzHistory = { runResults: [] };
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
@@ -199,6 +216,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     loadSessionName: string | undefined;
     availableLoadFiles: string[] | undefined;
     availableLoadSessions: string[] | undefined;
+    testCov: TestCov = {status: TestStatus.INVALID, events: []};
 
     /**
      * The number of steps back in the history to display; 0 means the most recent set of values is displayed,
@@ -210,6 +228,18 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         this.historyDepth = 1;
     }
 
+    private _activeTab: ActiveTab = JSON.parse(storage.getItem("activeTab") ?? JSON.stringify(ActiveTab.EI));
+    get activeTab(): ActiveTab {
+        return this._activeTab;
+    }
+    set activeTab(value) {
+        storage.setItem("activeTab", JSON.stringify(value));
+        this._activeTab = value;
+    }
+
+    /**
+     * A string by which to filter the class name of produced coverage, persisted in localStorage.
+     */
     private _classNameFilter: string = storage.getItem("classNameFilter") ?? "";
     get classNameFilter(): string {
         return this._classNameFilter;
@@ -224,6 +254,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         this.getEiAndGenOutput();
         this.getLoadFiles();
         this.getLoadSessions();
+        this.getTestCov();
     }
 
     // Returns a promise to allow us to await on the result on this request
@@ -297,6 +328,16 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             });
     }
 
+    getTestCov() {
+        m.request({
+            method: "GET",
+            url: SERVER_URL + "/run_test",
+        })
+            .then((result: TestCov) => {
+                this.testCov = result;
+            });
+    }
+
     getLoadFiles() {
         m.request({
             method: "GET",
@@ -319,11 +360,12 @@ export class RootTable extends MithrilTsxComponent<{ }> {
 
     view() {
         return (
-            <div>
+            <>
                 <table id="controlPanel">
                     <caption style={{textAlign: "left"}}>Controls</caption>
                     <thead>
                         <th>Generator</th>
+                        <th>Test Coverage</th>
                         <th>View</th>
                         <th>Session</th>
                     </thead>
@@ -389,9 +431,23 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 </div>
                             </td>
 
+                            {/* test coverage */}
+                            <td>
+                                <button type="submit" onclick={() =>
+                                    m.request({
+                                        method: "POST",
+                                        url: SERVER_URL + "/run_test"
+                                    })
+                                        .then((result: TestCov) => {
+                                            this.testCov = result;
+                                        })
+                                }>
+                                    Rerun Test Case
+                                </button>
+                            </td>
+
                             {/* view */}
                             <td>
-
                                 <label>
                                     Show unused EI:{" "}
                                     <input type="checkbox" id="showUnused" checked={this.showUnused}
@@ -495,27 +551,51 @@ export class RootTable extends MithrilTsxComponent<{ }> {
 
                 <br />
                 <table>
-                    <caption style={{textAlign: "left"}}>Generator Data</caption>
-                    <tbody>
                     <tr>
-                        <td>
-                            <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData}
-                                                   newEiChoices={this.newEiChoices}
-                                                   history={this.history}
-                                                   historyDepth={this.historyDepth}
-                                                   historicChoices={getHistoricChoices(this.history, this.historyDepth)}
-                                                   showUnused={this.showUnused}
-                                                   classNameFilter={this.classNameFilter}/>
-                        </td>
-                        <td>
-                            <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
-                                              prevOutput={this.history.runResults[this.history.runResults.length - this.historyDepth - 1]?.serializedResult?? ""}
-                                              ago={this.historyDepth}/>
-                        </td>
+                        <th style={{fontWeight: (this.activeTab === ActiveTab.EI) ? "bold" : "normal"}}
+                            onclick={() => {this.activeTab = ActiveTab.EI}}
+                        >
+                            Generator Data
+                        </th>
+                        <th style={{fontWeight: (this.activeTab === ActiveTab.COV) ? "bold" : "normal"}}
+                            onclick={() => {this.activeTab = ActiveTab.COV}}
+                        >
+                            Coverage Data
+                        </th>
                     </tr>
-                    </tbody>
                 </table>
-            </div>
+                {
+                    this.activeTab === ActiveTab.EI ? (
+                        <table>
+                            <tbody>
+                            <tr>
+                                <td>
+                                    <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData}
+                                                           newEiChoices={this.newEiChoices}
+                                                           history={this.history}
+                                                           historyDepth={this.historyDepth}
+                                                           historicChoices={getHistoricChoices(this.history, this.historyDepth)}
+                                                           showUnused={this.showUnused}
+                                                           classNameFilter={this.classNameFilter}/>
+                                </td>
+                                <td>
+                                    <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
+                                                      prevOutput={this.history.runResults[this.history.runResults.length - this.historyDepth - 1]?.serializedResult ?? ""}
+                                                      ago={this.historyDepth}/>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    ) : (
+                        <>
+                            <span><b>Status:</b> {this.testCov.status}</span>
+                            <table>
+                                {this.testCov.events.map((line: string) => <tr><td>{line}</td></tr>)}
+                            </table>
+                        </>
+                    )
+                }
+            </>
         );
     }
 }
