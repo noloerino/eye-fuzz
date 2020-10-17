@@ -29,7 +29,7 @@ class SessionSerializationTest {
             // create 0-2 EI
             val newEis = (0..rng.nextInt(3)).map { newExecutionIndex() }
             eis.addAll(newEis)
-            newEis.forEach { state.add(it) }
+            newEis.forEach { state.add(it, ChoiceKind.BYTE) }
         }
         // Make clones of the list in case some funky mutation occurs
         val originalHistory = state.history.copy(state.history.runResults)

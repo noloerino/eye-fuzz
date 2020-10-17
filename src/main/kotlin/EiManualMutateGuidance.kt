@@ -25,6 +25,10 @@ enum class GuidanceMode {
  * of test coverage, because there's some funky thread stuff going on.
  */
 class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guidance {
+
+    // TODO find less hacky way to access
+    var annotatingRandomSource: AnnotatingRandomSource? = null
+
     private var lastEvent: TraceEvent? = null
     /** The EI stack trace for generator runs */
     private var genEiState = EiState()
@@ -124,7 +128,7 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
                 // Get the execution index of the last event
                 val executionIndex = genEiState.getExecutionIndex(lastEvent!!)
                 log("\tREAD " + eventToString(lastEvent!!))
-                return fuzzState.add(executionIndex)
+                return fuzzState.add(executionIndex, annotatingRandomSource?.currType)
             }
         }
     }

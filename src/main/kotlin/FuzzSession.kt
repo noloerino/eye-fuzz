@@ -52,14 +52,14 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     /**
      * Adds the EI to the map if not present, and returns the choice made at this EI.
      */
-    fun add(ei: ExecutionIndex): Int {
+    fun add(ei: ExecutionIndex, kind: ChoiceKind?): Int {
         usedThisRun.add(ei)
         currRunResult.markUsed(ei)
         // Attempt to get a value from the map, or else generate a random value
         return eiMap.computeIfAbsent(ei) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
             // TODO handle case of repro, where this may actually be an update rather than create
-            currRunResult.createChoice(ei, guidance.getFullStackTrace(), choice)
+            currRunResult.createChoice(ei, guidance.getFullStackTrace(), choice, kind)
             EiData(guidance.getFullStackTrace(), choice)
         }.choice
     }
@@ -108,8 +108,9 @@ class RunResult {
         updateChoices.add(UpdateChoice(ei, old, choice))
     }
 
-    fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int) {
+    fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int, kind: ChoiceKind?) {
         createChoices.add(CreateChoice(ei, stackTrace, choice))
+        // println("EI: $ei with kind $kind")
     }
 
     fun applyUpdate(state: FuzzState) {

@@ -266,8 +266,9 @@ class Server<T>(private val gen: Generator<T>,
     private fun guidanceStub(runGen: Boolean) {
         if (runGen) {
             val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
-            val random: SourceOfRandomness = FastSourceOfRandomness(randomFile)
+            val random = AnnotatingRandomSource(randomFile)
             val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
+            genGuidance.annotatingRandomSource = random
             genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
             println(genGuidance.history.runResults.map { it.serializedResult })
             println("generator produced: " + getGenContents())
