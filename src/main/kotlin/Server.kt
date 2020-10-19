@@ -1,13 +1,11 @@
 import com.pholser.junit.quickcheck.generator.GenerationStatus
 import com.pholser.junit.quickcheck.generator.Generator
-import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import com.sun.net.httpserver.HttpServer
 import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.guidance.TimeoutException
 import edu.berkeley.cs.jqf.fuzz.junit.TrialRunner
-import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.TraceLogger

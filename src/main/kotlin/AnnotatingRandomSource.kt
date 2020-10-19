@@ -1,11 +1,12 @@
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.FastSourceOfRandomness
+import kotlinx.serialization.Serializable
 import java.io.Closeable
 
 enum class ChoiceKind {
     BOOLEAN,
     BYTE,
-    BYTE_ARRAY,
+    BYTE_ARRAY, // TODO figure out byte array size if necessary
     CHAR,
     CHOOSE,
     DOUBLE,
@@ -15,11 +16,28 @@ enum class ChoiceKind {
     SHORT
 }
 
+/**
+ * Represents type information for a byte mapped at an ExecutionIndex. The system is little endian, meaning that a
+ * byteOffset of 0 corresponds to the lowest 8 bits of an int, and similar for other data types.
+ */
+@Serializable
+data class ByteTypeInfo(val kind: ChoiceKind, val byteOffset: Int)
+
 // still need to implement: nextBigInteger, nextInstant, nextDuration
 class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomness(delegate) {
     // Keep track of which function actually was the top level
     var depth = 0
-    var currType: ChoiceKind? = null
+    private var currType: ChoiceKind? = null
+    var currOfs: Int = 0
+
+    /**
+     * Returns an object representing type information for the last retrieved byte. This function is not idempotent,
+     * as it also encodes information about the byte offset.
+     */
+    fun consumeNextTypeInfo(): ByteTypeInfo {
+        return ByteTypeInfo(currType!!, currOfs++)
+    }
+
     private fun delegateWrapper(choiceKind: ChoiceKind): Closeable {
         if (depth == 0) {
             currType = choiceKind
@@ -28,6 +46,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
         return Closeable {
             depth--
             if (depth == 0) {
+                currOfs = 0
                 currType = null
             }
         }

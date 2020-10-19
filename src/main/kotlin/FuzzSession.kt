@@ -52,15 +52,15 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     /**
      * Adds the EI to the map if not present, and returns the choice made at this EI.
      */
-    fun add(ei: ExecutionIndex, kind: ChoiceKind?): Int {
+    fun add(ei: ExecutionIndex, typeInfo: ByteTypeInfo): Int {
         usedThisRun.add(ei)
         currRunResult.markUsed(ei)
         // Attempt to get a value from the map, or else generate a random value
         return eiMap.computeIfAbsent(ei) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
             // TODO handle case of repro, where this may actually be an update rather than create
-            currRunResult.createChoice(ei, guidance.getFullStackTrace(), choice, kind)
-            EiData(guidance.getFullStackTrace(), choice)
+            currRunResult.createChoice(ei, guidance.getFullStackTrace(), choice, typeInfo)
+            EiData(guidance.getFullStackTrace(), typeInfo, choice)
         }.choice
     }
 
@@ -73,7 +73,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
     
     fun snapshot(): List<EiWithData> = eiMap.map { (ei, value) ->
-        EiWithData(ei, value.stackTrace, value.choice, ei in usedThisRun)
+        EiWithData(ei, value.stackTrace, value.typeInfo, value.choice, ei in usedThisRun)
     }
 }
 
@@ -93,7 +93,7 @@ class RunResult {
     data class UpdateChoice(val ei: SerializableEi, val old: Int, val new: Int)
 
     @Serializable
-    data class CreateChoice(val ei: SerializableEi, val stackTrace: StackTrace, val new: Int)
+    data class CreateChoice(val ei: SerializableEi, val stackTrace: StackTrace, val typeInfo: ByteTypeInfo, val new: Int)
 
     var serializedResult: String = ""
     private val markedUsed = mutableSetOf<SerializableEi>()
@@ -108,15 +108,14 @@ class RunResult {
         updateChoices.add(UpdateChoice(ei, old, choice))
     }
 
-    fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int, kind: ChoiceKind?) {
-        createChoices.add(CreateChoice(ei, stackTrace, choice))
-        // println("EI: $ei with kind $kind")
+    fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int, typeInfo: ByteTypeInfo) {
+        createChoices.add(CreateChoice(ei, stackTrace, typeInfo, choice))
     }
 
     fun applyUpdate(state: FuzzState) {
         markedUsed.forEach { state.usedThisRun.add(it) }
         createChoices.forEach {
-            (ei, stackTrace, choice) -> state.eiMap[ei] = EiData(stackTrace, choice)
+            (ei, stackTrace, typeInfo, choice) -> state.eiMap[ei] = EiData(stackTrace, typeInfo, choice)
         }
         updateChoices.forEach { (ei, choice) -> state.eiMap[ei]!!.choice = choice }
     }

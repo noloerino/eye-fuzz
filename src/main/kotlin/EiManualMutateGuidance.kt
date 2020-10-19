@@ -128,7 +128,7 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
                 // Get the execution index of the last event
                 val executionIndex = genEiState.getExecutionIndex(lastEvent!!)
                 log("\tREAD " + eventToString(lastEvent!!))
-                return fuzzState.add(executionIndex, annotatingRandomSource?.currType)
+                return fuzzState.add(executionIndex, annotatingRandomSource!!.consumeNextTypeInfo())
             }
         }
     }

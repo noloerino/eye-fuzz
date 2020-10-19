@@ -1,7 +1,7 @@
 import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "./common";
-import {EiWithData, ExecutionIndex, StackTraceLine} from "./common";
+import {ChoiceKind, EiWithData, ExecutionIndex, StackTraceLine} from "./common";
 import FuzzHistory from "./FuzzHistory";
 
 const SERVER_URL = "http://localhost:8000";
@@ -64,13 +64,24 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                     <th scope="col">ExecutionIndex</th>
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
+                    <th scope="col">Type Info</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
                 </tr>
                 </thead>
                 <tbody id="eiTableBody">
-                {vnode.attrs.eiTableData.flatMap(({ei, eiHash, stackTrace, choice, used}, i) => (
+                {vnode.attrs.eiTableData.flatMap((
+                    {
+                        ei,
+                        eiHash,
+                        stackTrace,
+                        typeInfo,
+                        choice,
+                        used
+                    },
+                    i
+                ) => (
                     (vnode.attrs.showUnused || used) ? [(
                         <tr>
                             <td className="eiCell" style={{
@@ -97,6 +108,9 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                             || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
                                     })
                                     .map(serializeStackTraceLine).join("\n")}
+                            </td>
+                            <td>
+                                {JSON.stringify(typeInfo)}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
@@ -304,18 +318,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 method: "GET",
                 url: SERVER_URL + "/ei",
             })
-                .then((arr: EiWithData[]) =>
-                    arr.map(({ei, eiHash, stackTrace, choice, used}) => {
-                        return {
-                            ei,
-                            eiHash,
-                            choice,
-                            stackTrace,
-                            used,
-                        };
-                    }))
+                .then((arr: EiWithData[]) => arr)
                 .catch(e =>
-                    [{ei: "ERROR " + e.message, eiHash: "", choice: 0, stackTrace: [], used: false}]
+                    [{ei: "ERROR " + e.message, eiHash: "", typeInfo: ChoiceKind.BYTE, choice: 0, stackTrace: [], used: false}]
                 )
         ])
             .then(([history, genOutput, eiData]: [FuzzHistory, string, EiWithData[]]) => {
