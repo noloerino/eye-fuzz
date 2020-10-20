@@ -8,6 +8,25 @@ const SERVER_URL = "http://localhost:8000";
 
 const storage = window.localStorage;
 
+enum ByteRender {
+    DECIMAL = "Decimal",
+    BINARY = "Binary",
+    HEX = "Hexadecimal"
+}
+
+function renderNumber(n: number, format: ByteRender): string {
+    switch (format) {
+        case ByteRender.DECIMAL:
+            return n.toString();
+        case ByteRender.BINARY:
+            return "0b" + n.toString(2);
+        case ByteRender.HEX:
+            return "0x" + n.toString(16);
+        default:
+            throw new Error("Bad number format: " + format);
+    }
+}
+
 type ExecutionIndexDisplayAttrs = {
     eiTableData: EiWithData[];
     history: FuzzHistory;
@@ -16,6 +35,7 @@ type ExecutionIndexDisplayAttrs = {
     newEiChoices: Map<number, number>;
     classNameFilter: string;
     showUnused: boolean;
+    renderer: (n: number | null) => string;
 };
 
 function serializeStackTraceLine(l: StackTraceLine): string {
@@ -116,13 +136,13 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                 <span>{
                                     // If the key is absent, then the value is the same as the current choice; if it
                                     // is present but null then it didn't yet exist
-                                    vnode.attrs.historicChoices.has(JSON.stringify(ei))
-                                        ? (vnode.attrs.historicChoices.get(JSON.stringify(ei)) ?? "--")
-                                        : choice
+                                    vnode.attrs.renderer(vnode.attrs.historicChoices.has(JSON.stringify(ei))
+                                        ? (vnode.attrs.historicChoices.get(JSON.stringify(ei)) ?? null)
+                                        : choice)
                                 }</span>
                             </td>
                             <td style={{textAlign: "center"}}>
-                                <span>{choice}</span>
+                                <span>{vnode.attrs.renderer(choice)}</span>
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="number" min={0} max={255} value={vnode.attrs.newEiChoices.get(i) ?? ""}
@@ -224,6 +244,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
     showUnused: boolean = true;
+    byteRender: ByteRender = ByteRender.DECIMAL;
     saveFileName: string | undefined;
     loadFileName: string | undefined;
     saveSessionName: string | undefined;
@@ -469,6 +490,15 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                     }}
                                     />
                                 </label>
+                                <br />
+                                <label>
+                                    Display format:{" "}
+                                    <select value={this.byteRender} onchange={(e: Event) => {
+                                        this.byteRender = ((e.target!! as HTMLSelectElement).value) as ByteRender;
+                                    }}>
+                                        {Object.values(ByteRender).map(v => <option value={v}>{v}</option>)}
+                                    </select>
+                                </label>
                                 <div>
                                     <label>
                                         View history:{" "}
@@ -581,6 +611,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                            historyDepth={this.historyDepth}
                                                            historicChoices={getHistoricChoices(this.history, this.historyDepth)}
                                                            showUnused={this.showUnused}
+                                                           renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
                                                            classNameFilter={this.classNameFilter}/>
                                 </td>
                                 <td>
