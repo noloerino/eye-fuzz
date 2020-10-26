@@ -2,7 +2,7 @@ import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "./common";
 import {ChoiceKind, EiWithData, ExecutionIndex, StackTraceLine} from "./common";
-import FuzzHistory from "./FuzzHistory";
+import {FuzzHistory, SerializedFuzzHistory} from "./FuzzHistory";
 
 const SERVER_URL = "http://localhost:8000";
 
@@ -344,8 +344,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     [{ei: "ERROR " + e.message, eiHash: "", typeInfo: ChoiceKind.BYTE, choice: 0, stackTrace: [], used: false}]
                 )
         ])
-            .then(([history, genOutput, eiData]: [FuzzHistory, string, EiWithData[]]) => {
-                this.history = history;
+            .then(([history, genOutput, eiData]: [SerializedFuzzHistory, string, EiWithData[]]) => {
+                this.history = history.toFuzzHistory();
                 this.resetHistoryDepth();
                 this.currRunInfo = {
                     eiTableData: eiData,
@@ -555,9 +555,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                 url: SERVER_URL + "/load_session",
                                                 body: {fileName: loadFileName},
                                             })
-                                                .then((history: FuzzHistory) => {
+                                                .then((history: SerializedFuzzHistory) => {
                                                     console.log("Loaded session", loadFileName);
-                                                    this.history = history;
+                                                    this.history = history.toFuzzHistory();
                                                     this.resetHistoryDepth();
                                                 })
                                                 .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));

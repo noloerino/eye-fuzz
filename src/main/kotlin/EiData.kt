@@ -12,14 +12,13 @@ data class EiData(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo, var ch
  * Represents an execution index without a stack trace, which is what is given back from POST/PATCH requests.
  */
 @Serializable
-data class EiWithoutStackTrace(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
-                               val choice: Int)
+data class EiWithoutStackTrace(val ei: SerializableEi, val choice: Int)
 
 /**
  * Represents data for an execution index that gets displayed on the frontend.
  */
 @Serializable
-data class EiWithData(val ei: @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex,
+data class EiWithData(val ei: SerializableEi,
                       val stackTrace: StackTrace,
                       val typeInfo: ByteTypeInfo,
                       val choice: Int,
@@ -27,7 +26,6 @@ data class EiWithData(val ei: @Serializable(with = ExecutionIndexSerializer::cla
     @Suppress("unused")
     val eiHash = ei.hashCode()
 }
-
 
 typealias StackTrace = List<StackTraceLine>
 
@@ -59,3 +57,5 @@ object ExecutionIndexSerializer : KSerializer<ExecutionIndex> {
         ListSerializer(Int.serializer()).serialize(encoder, arr)
     }
 }
+
+typealias SerializableEi = @Serializable(with = ExecutionIndexSerializer::class) ExecutionIndex
