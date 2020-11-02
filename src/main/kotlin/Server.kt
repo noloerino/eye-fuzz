@@ -1,8 +1,8 @@
 import com.pholser.junit.quickcheck.generator.GenerationStatus
 import com.pholser.junit.quickcheck.generator.Generator
 import com.sun.net.httpserver.HttpServer
-import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
+import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.guidance.TimeoutException
 import edu.berkeley.cs.jqf.fuzz.junit.TrialRunner
@@ -13,6 +13,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jacoco.core.analysis.Analyzer
+import org.jacoco.core.analysis.CoverageBuilder
+import org.jacoco.core.analysis.ICounter
+import org.jacoco.core.data.ExecutionDataStore
+import org.jacoco.core.data.SessionInfoStore
+import org.jacoco.core.instr.Instrumenter
+import org.jacoco.core.runtime.LoggerRuntime
+import org.jacoco.core.runtime.RuntimeData
 import org.junit.AssumptionViolatedException
 import org.junit.runners.model.FrameworkMethod
 import java.io.BufferedReader
@@ -20,6 +28,7 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
+
 
 /**
  * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to
@@ -218,21 +227,90 @@ class Server<T>(private val gen: Generator<T>,
         SingleSnoop.startSnooping(GUIDANCE_STUB_FULL_NAME)
         genGuidance.reset()
         println("Starting generator run (entp: ${SingleSnoop.entryPoints})")
-        this.guidanceStub(true)
+        this.guidanceStub()
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
     /**
-     * Runs a test case and obtains coverage for it.
-     *
-     * See the JQF class, and the way it interacts with the Fuzz annotation.
+     * A class loader that loads classes from in-memory data.
+     * Copied from https://www.jacoco.org/jacoco/trunk/doc/examples/java/CoreTutorial.java
+     */
+    class MemoryClassLoader : ClassLoader() {
+        private val definitions: MutableMap<String, ByteArray> = HashMap()
+
+        fun addDefinition(name: String, bytes: ByteArray) {
+            definitions[name] = bytes
+        }
+
+        override fun loadClass(name: String, resolve: Boolean): Class<*> {
+            val bytes = definitions[name]
+            return if (bytes != null) {
+                defineClass(name, bytes, 0, bytes.size)
+            } else super.loadClass(name, resolve)
+        }
+    }
+
+    /**
+     * Runs a test case and obtains coverage for it through Jacoco.
      */
     fun runTestCase() {
-        TraceLogger.get().remove()
-        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(GUIDANCE_STUB_FULL_NAME)
+        fun getTargetClass(targetName: String) = this::class.java
+                .getResourceAsStream("/${targetName.replace('.', '/')}.class")
         println("Starting test case run (entp: ${SingleSnoop.entryPoints})")
-        this.guidanceStub(false)
+        // https://www.jacoco.org/jacoco/trunk/doc/examples/java/CoreTutorial.java
+        // Unlike the example, we need to target a wrapper class for runnable
+        val targetName = TestWrapper::class.java.name
+        val runtime = LoggerRuntime()
+        // Create modified class with instrumentation
+        val instr = Instrumenter(runtime)
+        val instrumented: ByteArray = getTargetClass(targetName).use {
+            instr.instrument(it, targetName)
+        }
+        // Run instrumented class
+        val data = RuntimeData()
+        val memoryClassLoader = MemoryClassLoader()
+        memoryClassLoader.addDefinition(targetName, instrumented)
+        val targetClass: Class<*> = memoryClassLoader.loadClass(targetName)
+        // Execute class
+        val targetInstance = targetClass.newInstance() as TestWrapper
+        TestWrapper.genOutput = genGuidance.fuzzState.genOutput
+        TestWrapper.testClass = testClass
+        TestWrapper.testMethod = testMethod
+        targetInstance.run()
+        // Collect data and end runtime
+        val executionData = ExecutionDataStore()
+        val sessionInfos = SessionInfoStore()
+        data.collect(executionData, sessionInfos, false)
+        runtime.shutdown()
+        // Get coverage on test target, not runnable wrapper
+        val coverageBuilder = CoverageBuilder()
+        val analyzer = Analyzer(executionData, coverageBuilder)
+        getTargetClass(targetClass.name).use {
+            analyzer.analyzeClass(it, targetName)
+        }
+        // Dump coverage info
+        fun printCounter(unit: String, counter: ICounter) {
+            val missed = counter.missedCount
+            val total = counter.totalCount
+            println("$missed of $total $unit missed")
+        }
+        for (cc in coverageBuilder.classes) {
+            println("Coverage of class ${cc.name}")
+            printCounter("instructions", cc.instructionCounter)
+            printCounter("branches", cc.branchCounter)
+            printCounter("lines", cc.lineCounter)
+            printCounter("methods", cc.methodCounter)
+            printCounter("complexity", cc.complexityCounter)
+            for (i in cc.firstLine..cc.lastLine) {
+                val statStr = when (cc.getLine(i).status) {
+                    ICounter.NOT_COVERED -> "red"
+                    ICounter.PARTLY_COVERED -> "yellow"
+                    ICounter.FULLY_COVERED -> "green"
+                    else -> "???"
+                }
+                println("Line $i: $statStr")
+            }
+        }
         println("Finished test case run")
     }
 
@@ -243,58 +321,25 @@ class Server<T>(private val gen: Generator<T>,
 
     private fun getTestCaseCov(): TestCovResult {
         return TestCovResult(
-            lastTestResult,
-            // Need to filter to ensure size not too large
-            genGuidance.lastRunTestCov.toSet()
-                    .map { EiManualMutateGuidance.eventToString(it) }
-                    .filter { it.contains(testClass.name) }
+                lastTestResult,
+                // Need to filter to ensure size not too large
+                genGuidance.lastRunTestCov.toSet()
+                        .map { EiManualMutateGuidance.eventToString(it) }
+                        .filter { it.contains(testClass.name) }
         )
     }
 
     /**
-     * @param runGen if true, then reruns the generator; if false, then collects coverage data
-     *
-     * This weird coalescing into a single method is necessary to ensure that both methods can use the same entry point,
-     * as SingleSnoop seems to be unhappy otherwise.
-     * I verified this behavior by invoking runTest and runGenerator in sequence upon initialization of the server,
-     * and found that coverage would be collected only for the first of the two.
-     *
-     * TODO refactor argument to account for boolean blindness
+     * reruns the generator
      */
-    private fun guidanceStub(runGen: Boolean) {
-        if (runGen) {
-            val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
-            val random = AnnotatingRandomSource(randomFile)
-            val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
-            genGuidance.annotatingRandomSource = random
-            genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
-            println(genGuidance.history.runResults.map { it.serializedResult })
-            println("generator produced: " + getGenContents())
-        } else {
-            // TODO generalize by saving current obj rather than serialized string
-            val method = FrameworkMethod(testClass.getMethod(testMethod, String::class.java))
-            val testRunner = TrialRunner(testClass, method, arrayOf(genGuidance.fuzzState.genOutput))
-            // Handle exceptions (see FuzzStatement)
-            // https://github.com/rohanpadhye/JQF/blob/master/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java
-            val expectedExceptions = method.method.exceptionTypes
-            val result: Result = try {
-                testRunner.run()
-                Result.SUCCESS
-            } catch (e: AssumptionViolatedException) {
-                Result.INVALID
-            } catch (e: TimeoutException) {
-                Result.TIMEOUT
-            } catch (e: GuidanceException) {
-                throw e // Propagate error so we can quit
-            } catch (t: Throwable) {
-                if (expectedExceptions.any { it.isAssignableFrom(t::class.java) }) {
-                    Result.SUCCESS
-                } else {
-                    Result.FAILURE
-                }
-            }
-            lastTestResult = result
-        }
+    private fun guidanceStub() {
+        val randomFile = StreamBackedRandom(genGuidance.input, java.lang.Long.BYTES)
+        val random = AnnotatingRandomSource(randomFile)
+        val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
+        genGuidance.annotatingRandomSource = random
+        genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
+        println(genGuidance.history.runResults.map { it.serializedResult })
+        println("generator produced: " + getGenContents())
     }
 
     private var lastTestResult: Result = Result.SUCCESS

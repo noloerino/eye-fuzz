@@ -16,6 +16,13 @@
     </properties>
 
     <dependencies>
+        <!-- Jacoco to facilitate coverage gathering -->
+        <dependency>
+            <groupId>org.jacoco</groupId>
+            <artifactId>org.jacoco.core</artifactId>
+            <!-- Downgrade needed to avoid some "Unsupported api" message with asm library -->
+            <version>0.8.1</version>
+        </dependency>
         <!-- Google Closure: we want to test this library -->
         <dependency>
             <groupId>com.google.javascript</groupId>
