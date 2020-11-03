@@ -4,13 +4,32 @@
  */
 import {ExecutionIndex, StackTraceLine} from "./common"
 
+export enum ChoiceKind {
+    BOOLEAN = "BOOLEAN",
+    BYTE = "BYTE",
+    BYTE_ARRAY = "BYTE_ARRAY",
+    CHAR = "CHAR",
+    CHOOSE = "CHOOSE",
+    DOUBLE = "DOUBLE",
+    FLOAT = "FLOAT",
+    INT = "INT",
+    LONG = "LONG",
+    SHORT = "SHORT"
+}
+
+export type ByteTypeInfo = {
+    kind: ChoiceKind;
+    byteOffset: number;
+};
+
 type StackTrace = StackTraceLine[];
 
 // deserialized version
 export type FuzzHistory = {
+    typeInfo: ByteTypeInfo[];
     runResults: {
         serializedResult: string;
-        markUsed: ExecutionIndex[],
+        markedUsed: ExecutionIndex[],
         updateChoices: {
             ei: ExecutionIndex,
             old: number,
@@ -25,17 +44,18 @@ export type FuzzHistory = {
 };
 
 type CompressedEiKey = {
-    ei: ExecutionIndex,
+    ei: number[], // Comes as array rather than string
     stackTrace: StackTrace,
 };
 
 export type EiIndex = number;
 
-export class SerializedFuzzHistory {
+export type SerializedFuzzHistory = {
+    allTypeInfo: ByteTypeInfo[];
     eiList: CompressedEiKey[];
     runResults: {
         serializedResult: string;
-        markUsed: EiIndex[],
+        markedUsed: EiIndex[],
         updateChoices: {
             eiIndex: EiIndex,
             old: number,
@@ -46,29 +66,30 @@ export class SerializedFuzzHistory {
             "new": number,
         }[],
     }[];
+}
 
-    toFuzzHistory(): FuzzHistory {
-        return {
-            runResults: this.runResults.map(rr => {
-                return {
-                    serializedResult: rr.serializedResult,
-                    markUsed: rr.markUsed.map(i => this.eiList[i].ei),
-                    updateChoices: rr.updateChoices.map(choice => {
-                        return {
-                            ei: this.eiList[choice.eiIndex].ei,
-                            old: choice.old,
-                            "new": choice.new,
-                        };
-                    }),
-                    createChoices: rr.createChoices.map(choice => {
-                        return {
-                            ei: this.eiList[choice.eiIndex].ei,
-                            stackTrace: this.eiList[choice.eiIndex].stackTrace,
-                            "new": choice.new,
-                        };
-                    }),
-                };
-            })
-        };
-    }
+export function deserializeFuzzHistory(history: SerializedFuzzHistory): FuzzHistory {
+    return {
+        typeInfo: history.allTypeInfo,
+        runResults: history.runResults.map((rr) => {
+            return {
+                serializedResult: rr.serializedResult,
+                markedUsed: rr.markedUsed.map(i => JSON.stringify(history.eiList[i].ei)),
+                updateChoices: rr.updateChoices.map(choice => {
+                    return {
+                        ei: JSON.stringify(history.eiList[choice.eiIndex].ei),
+                        old: choice.old,
+                        "new": choice.new,
+                    };
+                }),
+                createChoices: rr.createChoices.map(choice => {
+                    return {
+                        ei: JSON.stringify(history.eiList[choice.eiIndex].ei),
+                        stackTrace: history.eiList[choice.eiIndex].stackTrace,
+                        "new": choice.new,
+                    };
+                }),
+            };
+        })
+    };
 }

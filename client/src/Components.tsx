@@ -1,8 +1,8 @@
 import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "./common";
-import {ChoiceKind, EiWithData, ExecutionIndex, StackTraceLine} from "./common";
-import {FuzzHistory, SerializedFuzzHistory} from "./FuzzHistory";
+import {EiWithData, ExecutionIndex, StackTraceLine} from "./common";
+import {ChoiceKind, deserializeFuzzHistory, FuzzHistory, SerializedFuzzHistory} from "./FuzzHistory";
 
 const SERVER_URL = "http://localhost:8000";
 
@@ -96,7 +96,6 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                         ei,
                         eiHash,
                         stackTrace,
-                        typeInfo,
                         choice,
                         used
                     },
@@ -130,7 +129,7 @@ class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAtt
                                     .map(serializeStackTraceLine).join("\n")}
                             </td>
                             <td>
-                                {JSON.stringify(typeInfo)}
+                                {JSON.stringify(vnode.attrs.history.typeInfo[i])}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
@@ -240,7 +239,7 @@ enum ActiveTab {
 }
 
 export class RootTable extends MithrilTsxComponent<{ }> {
-    history: FuzzHistory = { runResults: [] };
+    history: FuzzHistory = { typeInfo: [], runResults: [] };
     currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
     showUnused: boolean = true;
@@ -345,7 +344,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 )
         ])
             .then(([history, genOutput, eiData]: [SerializedFuzzHistory, string, EiWithData[]]) => {
-                this.history = history.toFuzzHistory();
+                this.history = deserializeFuzzHistory(history)
                 this.resetHistoryDepth();
                 this.currRunInfo = {
                     eiTableData: eiData,
@@ -557,7 +556,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                             })
                                                 .then((history: SerializedFuzzHistory) => {
                                                     console.log("Loaded session", loadFileName);
-                                                    this.history = history.toFuzzHistory();
+                                                    this.history = deserializeFuzzHistory(history);
                                                     this.resetHistoryDepth();
                                                 })
                                                 .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));

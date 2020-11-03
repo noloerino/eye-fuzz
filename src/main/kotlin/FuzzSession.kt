@@ -5,7 +5,7 @@ import kotlinx.serialization.json.Json
 import java.util.*
 
 @Serializable
-data class FuzzHistory(val eiList: List<CompressedEiKey>, val runResults: List<RunResult>)
+data class FuzzHistory(val allTypeInfo: List<ByteTypeInfo>, val eiList: List<CompressedEiKey>, val runResults: List<RunResult>)
 
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
     /**
@@ -30,7 +30,10 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         set(v) { currRunResult.serializedResult = v }
 
     // hides mutability of diffs, and remove first sentinel node
-    val history: FuzzHistory get() = FuzzHistory(eiList, diffStack)
+    val history: FuzzHistory get() {
+        assert(allTypeInfo.size == eiList.size) { "Type info and EI list sizes differed" }
+        return FuzzHistory(allTypeInfo, eiList, diffStack)
+    }
 
     fun resetForNewRun() {
         usedThisRun.clear()
@@ -65,7 +68,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
             // TODO handle case of repro, where this may actually be an update rather than create
             currRunResult.createChoice(ei, stackTrace, choice, typeInfo)
-            EiData(guidance.getFullStackTrace(), typeInfo, choice)
+            EiData(guidance.getFullStackTrace(), choice)
         }.choice
     }
 
@@ -78,7 +81,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
     
     fun snapshot(): List<EiWithData> = eiMap.map { (ei, value) ->
-        EiWithData(ei, value.stackTrace, value.typeInfo, value.choice, ei in usedThisRun)
+        EiWithData(ei, value.stackTrace, value.choice, ei in usedThisRun)
     }
 }
 
@@ -91,6 +94,7 @@ data class CompressedEiKey(val ei: SerializableEi, val stackTrace: StackTrace)
  * Allows for compression of EIs by storing integer indices instead of the full EI.
  */
 val eiList: MutableList<CompressedEiKey> = mutableListOf()
+val allTypeInfo = mutableListOf<ByteTypeInfo>()
 
 /**
  * Encodes information about changes produced over the course of a run.
@@ -118,7 +122,7 @@ class RunResult {
     data class UpdateChoice(val eiIndex: EiIndex, val old: Int, val new: Int)
 
     @Serializable
-    data class CreateChoice(val eiIndex: EiIndex, val typeInfo: ByteTypeInfo, val new: Int)
+    data class CreateChoice(val eiIndex: EiIndex, val new: Int)
 
     var serializedResult: String = ""
     private val markedUsed = mutableSetOf<EiIndex>()
@@ -134,13 +138,15 @@ class RunResult {
     }
 
     fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int, typeInfo: ByteTypeInfo) {
-        createChoices.add(CreateChoice(lookupOrStore(ei, stackTrace), typeInfo, choice))
+        val ind = CreateChoice(lookupOrStore(ei, stackTrace), choice)
+        createChoices.add(ind)
+        allTypeInfo.add(ind.eiIndex, typeInfo)
     }
 
     fun applyUpdate(state: FuzzState) {
         markedUsed.forEach { state.usedThisRun.add(eiList[it].ei) }
         createChoices.forEach {
-            (i, typeInfo, choice) -> state.eiMap[eiList[i].ei] = EiData(eiList[i].stackTrace, typeInfo, choice)
+            (i, choice) -> state.eiMap[eiList[i].ei] = EiData(eiList[i].stackTrace, choice)
         }
         updateChoices.forEach { (i, old, new) -> state.eiMap[eiList[i].ei]!!.choice = new }
     }
