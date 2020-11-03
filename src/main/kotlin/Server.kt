@@ -215,6 +215,7 @@ class Server<T>(private val gen: Generator<T>,
     private fun init() {
         System.setProperty("jqf.traceGenerators", "true")
         this.runGenerator()
+        this.runTestCase()
     }
 
     /**
@@ -256,7 +257,7 @@ class Server<T>(private val gen: Generator<T>,
     fun runTestCase() {
         fun getTargetClass(targetName: String) = this::class.java
                 .getResourceAsStream("/${targetName.replace('.', '/')}.class")
-        println("Starting test case run (entp: ${SingleSnoop.entryPoints})")
+        println("Starting Jacoco test case run")
         // https://www.jacoco.org/jacoco/trunk/doc/examples/java/CoreTutorial.java
         // Unlike the example, we need to target a wrapper class for runnable
         val targetName = TestWrapper::class.java.name
@@ -272,28 +273,45 @@ class Server<T>(private val gen: Generator<T>,
         memoryClassLoader.addDefinition(targetName, instrumented)
         val targetClass: Class<*> = memoryClassLoader.loadClass(targetName)
         // Execute class
-        val targetInstance = targetClass.newInstance() as TestWrapper
-        TestWrapper.genOutput = genGuidance.fuzzState.genOutput
-        TestWrapper.testClass = testClass
-        TestWrapper.testMethod = testMethod
+        val targetInstance = targetClass.newInstance() as Runnable
+        fun setTargetField(fieldName: String, value: Any) {
+            val field = targetInstance.javaClass.getDeclaredField(fieldName)
+            field.isAccessible = true
+            field.set(targetInstance, value)
+        }
+//        println("declared fields: ${targetInstance.javaClass.declaredFields.map { it.name }}")
+        setTargetField("genOutput", genGuidance.fuzzState.genOutput)
+        setTargetField("testClass", testClass)
+        setTargetField("testMethod", testMethod)
         targetInstance.run()
+        lastTestResult = targetInstance.javaClass.getField("lastTestResult").get(targetInstance) as Result
+        println("test result: $lastTestResult")
         // Collect data and end runtime
         val executionData = ExecutionDataStore()
         val sessionInfos = SessionInfoStore()
         data.collect(executionData, sessionInfos, false)
+        println("exec data: ${executionData.contents.map { it.name }}")
         runtime.shutdown()
         // Get coverage on test target, not runnable wrapper
         val coverageBuilder = CoverageBuilder()
         val analyzer = Analyzer(executionData, coverageBuilder)
-        getTargetClass(targetClass.name).use {
+        getTargetClass(targetName).use {
             analyzer.analyzeClass(it, targetName)
+        }
+        getTargetClass(testClass.name).use {
+            analyzer.analyzeClass(it, testClass.name)
+        }
+        val compName = com.google.javascript.jscomp.Compiler::class.java.name
+        getTargetClass(compName).use {
+            analyzer.analyzeClass(it, compName)
         }
         // Dump coverage info
         fun printCounter(unit: String, counter: ICounter) {
             val missed = counter.missedCount
             val total = counter.totalCount
-            println("$missed of $total $unit missed")
+            println("> $missed of $total $unit missed")
         }
+        println("no match: ${coverageBuilder.noMatchClasses}")
         for (cc in coverageBuilder.classes) {
             println("Coverage of class ${cc.name}")
             printCounter("instructions", cc.instructionCounter)
@@ -301,6 +319,7 @@ class Server<T>(private val gen: Generator<T>,
             printCounter("lines", cc.lineCounter)
             printCounter("methods", cc.methodCounter)
             printCounter("complexity", cc.complexityCounter)
+            /*
             for (i in cc.firstLine..cc.lastLine) {
                 val statStr = when (cc.getLine(i).status) {
                     ICounter.NOT_COVERED -> "red"
@@ -310,6 +329,7 @@ class Server<T>(private val gen: Generator<T>,
                 }
                 println("Line $i: $statStr")
             }
+            */
         }
         println("Finished test case run")
     }

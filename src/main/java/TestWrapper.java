@@ -14,14 +14,16 @@ import org.junit.runners.model.InitializationError;
  */
 public class TestWrapper implements Runnable {
 
-    public static String genOutput = null;
-    public static Class<?> testClass = null;
-    public static String testMethod = null;
+    // These fields should be set via reflection, since Jacoco instantiates an instrumented Runnable
+    // that can't be cast to TestWrapper directly
+    public String genOutput = null;
+    public Class<?> testClass = null;
+    public String testMethod = null;
 
-    public static Result lastTestResult = null;
+    // This field should be read via reflection, for the same reason mentioned above (Jacoco jank)
+    public Result lastTestResult = null;
 
     public void run() {
-        System.out.println("BEGIN RUN");
         // TODO generalize by saving current obj rather than serialized string
         try {
             FrameworkMethod method = new FrameworkMethod(testClass.getMethod(testMethod, String.class));
