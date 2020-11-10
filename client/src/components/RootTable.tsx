@@ -1,55 +1,14 @@
 import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
-import "./common";
-import {EiWithData, ExecutionIndex, StackTraceLine} from "./common";
-import {ChoiceKind, deserializeFuzzHistory, FuzzHistory, SerializedFuzzHistory} from "./FuzzHistory";
+import "../common";
+import {ByteRender, renderNumber, ChoiceKind, EiWithData, ExecutionIndex} from "../common";
+import {ExecutionIndexByteDisplay} from "./ExecutionIndexByteDisplay";
+import {GenOutputDisplay} from "./GenOutputDisplay";
+import {deserializeFuzzHistory, FuzzHistory, SerializedFuzzHistory} from "../FuzzHistory";
 
 const SERVER_URL = "http://localhost:8000";
 
 const storage = window.localStorage;
-
-enum ByteRender {
-    DECIMAL = "Decimal",
-    BINARY = "Binary",
-    HEX = "Hexadecimal"
-}
-
-function renderNumber(n: number, format: ByteRender): string {
-    switch (format) {
-        case ByteRender.DECIMAL:
-            return n.toString();
-        case ByteRender.BINARY:
-            return "0b" + n.toString(2);
-        case ByteRender.HEX:
-            return "0x" + n.toString(16);
-        default:
-            throw new Error("Bad number format: " + format);
-    }
-}
-
-type ExecutionIndexDisplayAttrs = {
-    eiTableData: EiWithData[];
-    history: FuzzHistory;
-    historyDepth: number;
-    historicChoices: Map<ExecutionIndex, number | null>;
-    newEiChoices: Map<number, number>;
-    classNameFilter: string;
-    showUnused: boolean;
-    renderer: (n: number | null) => string;
-};
-
-function serializeStackTraceLine(l: StackTraceLine): string {
-    let cl = l.callLocation;
-    return `(${l.count}) ${cl.containingClass}#${cl.containingMethodName}()@${cl.lineNumber} --> ${cl.invokedMethodName}`;
-}
-
-function displayEi(ei: ExecutionIndex): string {
-    let eiString = "";
-    for (let i = 0; i < ei.length; i += 2) {
-        eiString += ei[i] + " (" + ei[i + 1] + ")\n"
-    }
-    return eiString;
-}
 
 /**
  * Returns a map of old choices for the specified depth.
@@ -73,147 +32,6 @@ function getHistoricChoices(history: FuzzHistory, ago: number): Map<ExecutionInd
         lastCreates.forEach(({ei}) => oldEiChoices.set(JSON.stringify(ei), null));
     }
     return oldEiChoices;
-}
-
-class ExecutionIndexDisplay extends MithrilTsxComponent<ExecutionIndexDisplayAttrs> {
-    view(vnode: Vnode<ExecutionIndexDisplayAttrs, this>) {
-        return (
-            <table>
-                <thead>
-                <tr>
-                    <th scope="col">ExecutionIndex</th>
-                    <th scope="col">Used</th>
-                    <th scope="col">Stack Trace</th>
-                    <th scope="col">Type Info</th>
-                    <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
-                    <th scope="col">Current Value</th>
-                    <th scope="col">New Value</th>
-                </tr>
-                </thead>
-                <tbody id="eiTableBody">
-                {vnode.attrs.eiTableData.flatMap((
-                    {
-                        ei,
-                        eiHash,
-                        stackTrace,
-                        choice,
-                        used
-                    },
-                    i
-                ) => (
-                    (vnode.attrs.showUnused || used) ? [(
-                        <tr>
-                            <td className="eiCell" style={{
-                                maxWidth: "10em",
-                                overflow: "scroll",
-                                textOverflow: "clip",
-                                whiteSpace: "pre-wrap"
-                            }}>
-                                {displayEi(ei)}
-                            </td>
-                            <td style={{textAlign: "center"}}>
-                                <input type="checkbox" disabled={true} checked={used} />
-                            </td>
-                            <td className="stackTraceCell" style={{
-                                maxWidth: "60em",
-                                overflow: "scroll",
-                                textOverflow: "clip",
-                                whiteSpace: "pre-wrap"
-                            }}>
-                                {stackTrace
-                                    .filter((l: StackTraceLine) => {
-                                        let targetClass = vnode.attrs.classNameFilter;
-                                        return (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
-                                    })
-                                    .map(serializeStackTraceLine).join("\n")}
-                            </td>
-                            <td>
-                                {JSON.stringify(vnode.attrs.history.typeInfo[i])}
-                            </td>
-                            <td id="lessRecent" style={{textAlign: "center"}}>
-                                <span>{
-                                    // If the key is absent, then the value is the same as the current choice; if it
-                                    // is present but null then it didn't yet exist
-                                    vnode.attrs.renderer(vnode.attrs.historicChoices.has(JSON.stringify(ei))
-                                        ? (vnode.attrs.historicChoices.get(JSON.stringify(ei)) ?? null)
-                                        : choice)
-                                }</span>
-                            </td>
-                            <td style={{textAlign: "center"}}>
-                                <span>{vnode.attrs.renderer(choice)}</span>
-                            </td>
-                            <td style={{textAlign: "center"}}>
-                                <input type="number" min={0} max={255} value={vnode.attrs.newEiChoices.get(i) ?? ""}
-                                    oninput={(e: InputEvent) => {
-                                        let value = (e.target as HTMLInputElement)?.value ?? "";
-                                        if (value === "") {
-                                            vnode.attrs.newEiChoices.delete(i);
-                                        } else {
-                                            // TODO ceiling/floor this
-                                            vnode.attrs.newEiChoices.set(i, parseInt(value));
-                                        }
-                                    }}
-                                />
-                            </td>
-                        </tr>
-                    )] : []
-                ))}
-                </tbody>
-            </table>
-        )
-    }
-}
-
-type GenOutputDisplayAttrs = {
-    currOutput: string;
-    prevOutput: string;
-    ago: number;
-};
-
-const GEN_CELL_STYLE = {
-    maxHeight: "20em",
-    maxWidth: "30em",
-    whiteSpace: "pre-wrap",
-    fontSize: 14,
-    fontFamily: '"PT Mono", "Courier"'
-};
-
-class GenOutputDisplay extends MithrilTsxComponent<GenOutputDisplayAttrs> {
-    view(vnode: Vnode<GenOutputDisplayAttrs, this>) {
-        return (
-            <>
-                <table>
-                    <thead>
-                    <tr>
-                        <th scope="col">Current Generator Output</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr>
-                        <td style={GEN_CELL_STYLE}>
-                            {vnode.attrs.currOutput}
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-                <table>
-                    <thead>
-                    <tr>
-                        <th scope="col">Generator Output {vnode.attrs.ago} Run(s) Ago</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr>
-                        <td style={GEN_CELL_STYLE}>
-                            {vnode.attrs.prevOutput}
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </>
-        );
-    }
 }
 
 type RunInfo = {
@@ -240,7 +58,7 @@ enum ActiveTab {
 
 export class RootTable extends MithrilTsxComponent<{ }> {
     history: FuzzHistory = { typeInfo: [], runResults: [] };
-    currRunInfo: RunInfo = {eiTableData: [], genOutput: ""};
+    currRunInfo: RunInfo = { eiTableData: [], genOutput: ""};
     newEiChoices: Map<number, number> = new Map();
     showUnused: boolean = true;
     byteRender: ByteRender = ByteRender.DECIMAL;
@@ -340,7 +158,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             })
                 .then((arr: EiWithData[]) => arr)
                 .catch(e =>
-                    [{ei: "ERROR " + e.message, eiHash: "", typeInfo: ChoiceKind.BYTE, choice: 0, stackTrace: [], used: false}]
+                    [{ei: "ERROR " + e.message, typeInfo: ChoiceKind.BYTE, choice: 0, stackTrace: [], used: false}]
                 )
         ])
             .then(([history, genOutput, eiData]: [SerializedFuzzHistory, string, EiWithData[]]) => {
@@ -604,7 +422,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             <tbody>
                             <tr>
                                 <td>
-                                    <ExecutionIndexDisplay eiTableData={this.currRunInfo.eiTableData}
+                                    <ExecutionIndexByteDisplay eiTableData={this.currRunInfo.eiTableData}
                                                            newEiChoices={this.newEiChoices}
                                                            history={this.history}
                                                            historyDepth={this.historyDepth}

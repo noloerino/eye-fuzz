@@ -215,7 +215,7 @@ class Server<T>(private val gen: Generator<T>,
     private fun init() {
         System.setProperty("jqf.traceGenerators", "true")
         this.runGenerator()
-        this.runTestCase()
+//        this.runTestCase()
     }
 
     /**

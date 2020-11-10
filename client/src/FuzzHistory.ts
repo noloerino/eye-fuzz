@@ -2,25 +2,7 @@
  * The history of a fuzzing session is represented as a List<List<EiDiff>>.
  * Each item in the list represents a sequence of changes produced by the server.
  */
-import {ExecutionIndex, StackTraceLine} from "./common"
-
-export enum ChoiceKind {
-    BOOLEAN = "BOOLEAN",
-    BYTE = "BYTE",
-    BYTE_ARRAY = "BYTE_ARRAY",
-    CHAR = "CHAR",
-    CHOOSE = "CHOOSE",
-    DOUBLE = "DOUBLE",
-    FLOAT = "FLOAT",
-    INT = "INT",
-    LONG = "LONG",
-    SHORT = "SHORT"
-}
-
-export type ByteTypeInfo = {
-    kind: ChoiceKind;
-    byteOffset: number;
-};
+import {ByteTypeInfo, ExecutionIndex, StackTraceLine} from "./common"
 
 type StackTrace = StackTraceLine[];
 

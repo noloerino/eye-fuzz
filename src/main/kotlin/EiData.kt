@@ -21,10 +21,7 @@ data class EiWithoutStackTrace(val ei: SerializableEi, val choice: Int)
 data class EiWithData(val ei: SerializableEi,
                       val stackTrace: StackTrace,
                       val choice: Int,
-                      val used: Boolean) {
-    @Suppress("unused")
-    val eiHash = ei.hashCode()
-}
+                      val used: Boolean)
 
 typealias StackTrace = List<StackTraceLine>
 
