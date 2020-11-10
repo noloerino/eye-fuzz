@@ -49,15 +49,17 @@ export type StackTraceLine = {
 
 export type ExecutionIndex = string;
 
+export type EiIndex = number;
+
 export type EiWithData = {
-    ei: ExecutionIndex;
+    ei: number[];
     choice: number;
     stackTrace: StackTraceLine[];
     used: boolean;
 };
 
 export type TypedEiWithData = {
-    descendantIndices: number[]; // indices of EI that are its children, in byte offset order
+    descendantIndices: EiIndex[]; // indices of EI that are its children, in byte offset order
     kind: ChoiceKind;
     // TODO add bounds and handle byte array case
     choice: number;
@@ -65,13 +67,20 @@ export type TypedEiWithData = {
     used: boolean;
 };
 
+export function getByte(n: number, ofs: number): number {
+    return (n >> (8 * ofs)) & 0xFF;
+}
+
+export function setByte(n: number, ofs: number, v: number): number {
+    return n & (~(0xFF << (8 * ofs))) | (v << (8 * ofs));
+}
+
 export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): TypedEiWithData[] {
     console.assert(allTypeInfo.length > 0);
     console.assert(allTypeInfo[0].byteOffset == 0);
-    let arr = [];
+    let arr: TypedEiWithData[] = [];
     let curr: TypedEiWithData | null = null;
-    for (let i in allTypeInfo) {
-        let typeInfo = allTypeInfo[i];
+    allTypeInfo.forEach((typeInfo, i) => {
         if (typeInfo.byteOffset == 0) {
             if (curr != null) {
                 arr.push(curr)
@@ -84,27 +93,9 @@ export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): Typ
                 used: eis[i].used
             };
         }
-        console.assert(typeInfo.byteOffset === arr.length);
-        curr!!.descendantIndices.push()
+        curr!!.descendantIndices.push(i)
+        // fine to |= because we assume those bytes haven't been filled yet
         curr!!.choice |= (eis[i].choice << (8 * typeInfo.byteOffset));
-    }
-    return arr;
-}
-
-export function removeTypeInfo(typedEis: TypedEiWithData[], eiList: ExecutionIndex[]): EiWithData[] {
-    let arr: EiWithData[] = [];
-    for (let typedEi of typedEis) {
-        typedEi.descendantIndices.forEach((child, i) =>{
-            arr.push(
-                {
-                    ei: eiList[child],
-                    // Select appropriate byte
-                    choice: (typedEi.choice >> (8 * i)) & 0xFF,
-                    stackTrace: typedEi.stackTrace,
-                    used: typedEi.used
-                }
-            );
-        });
-    }
+    });
     return arr;
 }

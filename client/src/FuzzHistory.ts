@@ -2,23 +2,24 @@
  * The history of a fuzzing session is represented as a List<List<EiDiff>>.
  * Each item in the list represents a sequence of changes produced by the server.
  */
-import {ByteTypeInfo, ExecutionIndex, StackTraceLine} from "./common"
+import {ByteTypeInfo, ExecutionIndex, EiIndex, StackTraceLine} from "./common"
 
 type StackTrace = StackTraceLine[];
 
 // deserialized version
 export type FuzzHistory = {
     typeInfo: ByteTypeInfo[];
+    eiList: number[][];
     runResults: {
         serializedResult: string;
-        markedUsed: ExecutionIndex[],
+        markedUsed: EiIndex[],
         updateChoices: {
-            ei: ExecutionIndex,
+            eiIndex: EiIndex,
             old: number,
             "new": number,
         }[],
         createChoices: {
-            ei: ExecutionIndex,
+            eiIndex: EiIndex,
             stackTrace: StackTrace,
             "new": number,
         }[],
@@ -29,8 +30,6 @@ type CompressedEiKey = {
     ei: number[], // Comes as array rather than string
     stackTrace: StackTrace,
 };
-
-export type EiIndex = number;
 
 export type SerializedFuzzHistory = {
     allTypeInfo: ByteTypeInfo[];
@@ -53,20 +52,15 @@ export type SerializedFuzzHistory = {
 export function deserializeFuzzHistory(history: SerializedFuzzHistory): FuzzHistory {
     return {
         typeInfo: history.allTypeInfo,
+        eiList: history.eiList.map(key => key.ei),
         runResults: history.runResults.map((rr) => {
             return {
                 serializedResult: rr.serializedResult,
-                markedUsed: rr.markedUsed.map(i => JSON.stringify(history.eiList[i].ei)),
-                updateChoices: rr.updateChoices.map(choice => {
-                    return {
-                        ei: JSON.stringify(history.eiList[choice.eiIndex].ei),
-                        old: choice.old,
-                        "new": choice.new,
-                    };
-                }),
+                markedUsed: rr.markedUsed,
+                updateChoices: rr.updateChoices,
                 createChoices: rr.createChoices.map(choice => {
                     return {
-                        ei: JSON.stringify(history.eiList[choice.eiIndex].ei),
+                        eiIndex: choice.eiIndex,
                         stackTrace: history.eiList[choice.eiIndex].stackTrace,
                         "new": choice.new,
                     };

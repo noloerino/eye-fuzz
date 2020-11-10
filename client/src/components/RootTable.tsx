@@ -1,8 +1,8 @@
 import m, {Vnode} from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "../common";
-import {ByteRender, renderNumber, ChoiceKind, EiWithData, ExecutionIndex} from "../common";
-import {ExecutionIndexByteDisplay} from "./ExecutionIndexByteDisplay";
+import {ByteRender, renderNumber, ChoiceKind, EiWithData, ExecutionIndex, EiIndex, addTypeInfo} from "../common";
+import {EiByteDisplay, EiTypedDisplay} from "./EiDisplay";
 import {GenOutputDisplay} from "./GenOutputDisplay";
 import {deserializeFuzzHistory, FuzzHistory, SerializedFuzzHistory} from "../FuzzHistory";
 
@@ -17,19 +17,16 @@ const storage = window.localStorage;
  * @param history
  * @param ago
  */
-function getHistoricChoices(history: FuzzHistory, ago: number): Map<ExecutionIndex, number | null> {
+function getHistoricChoices(history: FuzzHistory, ago: number): Map<EiIndex, number | null> {
     let oldEiChoices = new Map();
     // Examine every update or create from current to (ago) creations in the past
-    let i = 0;
-    for (i = 0; i < ago; i++) {
+    for (let i = 0; i < ago; i++) {
         // TODO because updates are stored BEFORE a generator run is reset, we actually need to
         // look one level deeper for updates
         let lastUpdates = history.runResults[history.runResults.length - ago - 1]?.updateChoices ?? [];
-        // Annoyingly, we need to stringify the EI before storing it because ES6 maps use Object.is
-        // to compare equality, which essentially checks references for non-string objects (including arrays)
-        lastUpdates.forEach(({ei, old}) => oldEiChoices.set(JSON.stringify(ei), old));
+        lastUpdates.forEach(({eiIndex, old}) => oldEiChoices.set(eiIndex, old));
         let lastCreates = history.runResults[history.runResults.length - ago]?.createChoices ?? [];
-        lastCreates.forEach(({ei}) => oldEiChoices.set(JSON.stringify(ei), null));
+        lastCreates.forEach(({eiIndex}) => oldEiChoices.set(eiIndex, null));
     }
     return oldEiChoices;
 }
@@ -57,9 +54,10 @@ enum ActiveTab {
 }
 
 export class RootTable extends MithrilTsxComponent<{ }> {
-    history: FuzzHistory = { typeInfo: [], runResults: [] };
+    displayTypedEi: boolean = false;
+    history: FuzzHistory = { typeInfo: [], eiList: [], runResults: [] };
     currRunInfo: RunInfo = { eiTableData: [], genOutput: ""};
-    newEiChoices: Map<number, number> = new Map();
+    newEiChoices: Map<EiIndex, number> = new Map();
     showUnused: boolean = true;
     byteRender: ByteRender = ByteRender.DECIMAL;
     saveFileName: string | undefined;
@@ -292,6 +290,15 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             {/* view */}
                             <td>
                                 <label>
+                                    Show type-level decisions:{" "}
+                                    <input type="checkbox" id="displayTyped" checked={this.displayTypedEi}
+                                           oninput={(e: Event) => {
+                                               this.displayTypedEi= (e.target as HTMLInputElement).checked;
+                                           }}
+                                    />
+                                </label>
+                                <br />
+                                <label>
                                     Show unused EI:{" "}
                                     <input type="checkbox" id="showUnused" checked={this.showUnused}
                                            oninput={(e: Event) => {
@@ -422,14 +429,25 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             <tbody>
                             <tr>
                                 <td>
-                                    <ExecutionIndexByteDisplay eiTableData={this.currRunInfo.eiTableData}
-                                                           newEiChoices={this.newEiChoices}
-                                                           history={this.history}
-                                                           historyDepth={this.historyDepth}
-                                                           historicChoices={getHistoricChoices(this.history, this.historyDepth)}
-                                                           showUnused={this.showUnused}
-                                                           renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
-                                                           classNameFilter={this.classNameFilter}/>
+                                    {this.displayTypedEi
+                                        ? <EiTypedDisplay typedData={addTypeInfo(this.history.typeInfo, this.currRunInfo.eiTableData)}
+                                                          eiList={this.history.eiList}
+                                                          history={this.history} historyDepth={this.historyDepth}
+                                                          historicChoices={getHistoricChoices(this.history, this.historyDepth)}
+                                                          showUnused={this.showUnused}
+                                                          renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
+                                                          newEiChoices={this.newEiChoices}
+                                                          classNameFilter={this.classNameFilter} />
+                                        : <EiByteDisplay eiTableData={this.currRunInfo.eiTableData}
+                                                         newEiChoices={this.newEiChoices}
+                                                         history={this.history}
+                                                         historyDepth={this.historyDepth}
+                                                         historicChoices={getHistoricChoices(this.history, this.historyDepth)}
+                                                         showUnused={this.showUnused}
+                                                         renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
+                                                         classNameFilter={this.classNameFilter} />
+                                    }
+
                                 </td>
                                 <td>
                                     <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
