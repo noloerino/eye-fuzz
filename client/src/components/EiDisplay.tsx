@@ -200,7 +200,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                             <StackTraceCell classNameFilter={vnode.attrs.classNameFilter}
                                             stackTrace={stackTrace} />
                             <td>
-                                {JSON.stringify(kind)}
+                                {kind}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
