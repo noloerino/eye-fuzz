@@ -76,12 +76,15 @@ export function setByte(n: number, ofs: number, v: number): number {
 }
 
 export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): TypedEiWithData[] {
+    if (eis.length === 0) {
+        return [];
+    }
     console.assert(allTypeInfo.length > 0);
     console.assert(allTypeInfo[0].byteOffset == 0);
     let arr: TypedEiWithData[] = [];
     let curr: TypedEiWithData | null = null;
     allTypeInfo.forEach((typeInfo, i) => {
-        if (typeInfo.byteOffset == 0) {
+        if (typeInfo.byteOffset === 0) {
             if (curr != null) {
                 arr.push(curr)
             }
