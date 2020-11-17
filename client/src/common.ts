@@ -31,9 +31,15 @@ export enum ChoiceKind {
     SHORT = "SHORT"
 }
 
+export type Bounds = {
+    min: number,
+    max: number
+};
+
 export type ByteTypeInfo = {
     kind: ChoiceKind;
     byteOffset: number;
+    bounds: Bounds | null;
 };
 
 export type StackTraceLine = {
@@ -61,7 +67,8 @@ export type EiWithData = {
 export type TypedEiWithData = {
     descendantIndices: EiIndex[]; // indices of EI that are its children, in byte offset order
     kind: ChoiceKind;
-    // TODO add bounds and handle byte array case
+    bounds: Bounds | null;
+    // TODO handle byte array case
     choice: number;
     stackTrace: StackTraceLine[];
     used: boolean;
@@ -91,6 +98,7 @@ export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): Typ
             curr = {
                 descendantIndices: [],
                 kind: typeInfo.kind,
+                bounds: typeInfo.bounds,
                 choice: eis[i].choice,
                 stackTrace: eis[i].stackTrace,
                 used: eis[i].used

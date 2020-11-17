@@ -168,6 +168,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
                     <th scope="col">Type</th>
+                    <th scope="col">Min - Max</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
@@ -178,6 +179,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                     {
                         descendantIndices,
                         kind,
+                        bounds,
                         choice,
                         stackTrace,
                         used
@@ -201,6 +203,9 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                             stackTrace={stackTrace} />
                             <td style={{textAlign: "center"}}>
                                 {kind}
+                            </td>
+                            <td style={{textAlign: "center"}}>
+                                {bounds || "N/A"}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{

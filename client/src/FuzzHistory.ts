@@ -2,7 +2,7 @@
  * The history of a fuzzing session is represented as a List<List<EiDiff>>.
  * Each item in the list represents a sequence of changes produced by the server.
  */
-import {ByteTypeInfo, ExecutionIndex, EiIndex, StackTraceLine} from "./common"
+import {ByteTypeInfo, EiIndex, StackTraceLine} from "./common"
 
 type StackTrace = StackTraceLine[];
 

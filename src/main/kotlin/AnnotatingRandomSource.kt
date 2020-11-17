@@ -17,11 +17,21 @@ enum class ChoiceKind {
 }
 
 /**
+ * Represents upper and lower bounds on an integer data type up to sizeof(int).
+ * This allows support for methods like nextByte(min, max) that make a call to fastChooseByteInRange, which
+ * does some modular math for faster generation.
+ *
+ * min is inclusive, max is exclusive
+ */
+@Serializable
+data class Bounds(val min: Int, val max: Int)
+
+/**
  * Represents type information for a byte mapped at an ExecutionIndex. The system is little endian, meaning that a
  * byteOffset of 0 corresponds to the lowest 8 bits of an int, and similar for other data types.
  */
 @Serializable
-data class ByteTypeInfo(val kind: ChoiceKind, val byteOffset: Int)
+data class ByteTypeInfo(val kind: ChoiceKind, val byteOffset: Int, val intBounds: Bounds? = null)
 
 // still need to implement: nextBigInteger, nextInstant, nextDuration
 class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomness(delegate) {
@@ -29,6 +39,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     var depth = 0
     private var currType: ChoiceKind? = null
     var currOfs: Int = 0
+    var currBounds: Bounds? = null
 
     /**
      * Returns an object representing type information for the last retrieved byte. This function is not idempotent,
@@ -38,9 +49,10 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
         return ByteTypeInfo(currType!!, currOfs++)
     }
 
-    private fun delegateWrapper(choiceKind: ChoiceKind): Closeable {
+    private fun delegateWrapper(choiceKind: ChoiceKind, bounds: Bounds? = null): Closeable {
         if (depth == 0) {
             currType = choiceKind
+            currBounds = bounds
         }
         depth++
         return Closeable {
@@ -48,6 +60,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
             if (depth == 0) {
                 currOfs = 0
                 currType = null
+                currBounds = null
             }
         }
     }
@@ -85,15 +98,15 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     }
 
     override fun nextByte(min: Byte, max: Byte): Byte {
-        return delegateWrapper(ChoiceKind.BYTE).use { super.nextByte(min, max) }
+        return delegateWrapper(ChoiceKind.BYTE, Bounds(min.toInt(), max.toInt())).use { super.nextByte(min, max) }
     }
 
     override fun nextShort(min: Short, max: Short): Short {
-        return delegateWrapper(ChoiceKind.SHORT).use { super.nextShort(min, max) }
+        return delegateWrapper(ChoiceKind.SHORT, Bounds(min.toInt(), max.toInt())).use { super.nextShort(min, max) }
     }
 
     override fun nextChar(min: Char, max: Char): Char {
-        return delegateWrapper(ChoiceKind.CHAR).use { super.nextChar(min, max) }
+        return delegateWrapper(ChoiceKind.CHAR, Bounds(min.toInt(), max.toInt())).use { super.nextChar(min, max) }
     }
 
     override fun nextInt(): Int {
@@ -105,7 +118,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     }
 
     override fun nextInt(min: Int, max: Int): Int {
-        return delegateWrapper(ChoiceKind.INT).use { super.nextInt(min, max) }
+        return delegateWrapper(ChoiceKind.INT, Bounds(min, max)).use { super.nextInt(min, max) }
     }
 
     override fun nextLong(): Long {

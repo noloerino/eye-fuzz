@@ -45,7 +45,7 @@ import static java.lang.Math.log;
 
 /**
  * Copied from JQF with some parameters changed
- * @author Rohan Padhye
+ * @author Rohan Padhye, slightly modified by Jonathan Shi
  */
 public class JavaScriptCodeGenerator extends Generator<String> {
     public JavaScriptCodeGenerator() {
