@@ -1,7 +1,7 @@
-import m, {Vnode} from "mithril";
+import m from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "../common";
-import {ByteRender, renderNumber, ChoiceKind, EiWithData, ExecutionIndex, EiIndex, addTypeInfo} from "../common";
+import {ByteRender, renderNumber, ChoiceKind, EiWithData, EiIndex, addTypeInfo} from "../common";
 import {EiByteDisplay, EiTypedDisplay} from "./EiDisplay";
 import {GenOutputDisplay} from "./GenOutputDisplay";
 import {deserializeFuzzHistory, FuzzHistory, SerializedFuzzHistory} from "../FuzzHistory";

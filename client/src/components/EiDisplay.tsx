@@ -1,7 +1,7 @@
 import m, {Vnode} from "mithril";
 // Necessary to prevent mithril from getting dead code eliminated...
 const _m = m;
-import {EiIndex, EiWithData, ExecutionIndex, getByte, setByte, StackTraceLine, TypedEiWithData} from "../common";
+import {EiIndex, EiWithData, getByte, setByte, StackTraceLine, TypedEiWithData} from "../common";
 import {FuzzHistory} from "../FuzzHistory";
 import {MithrilTsxComponent} from "mithril-tsx-component";
 
