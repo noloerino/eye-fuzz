@@ -1,7 +1,7 @@
 import m, {Vnode} from "mithril";
 // Necessary to prevent mithril from getting dead code eliminated...
 const _m = m;
-import {EiIndex, EiWithData, getByte, setByte, StackTraceLine, TypedEiWithData} from "../common";
+import {Bounds, EiIndex, EiWithData, getByte, setByte, StackTraceLine, TypedEiWithData} from "../common";
 import {FuzzHistory} from "../FuzzHistory";
 import {MithrilTsxComponent} from "mithril-tsx-component";
 
@@ -150,7 +150,7 @@ type TypedDisplayAttrs = {
     newEiChoices: Map<EiIndex, number>;
     classNameFilter: string;
     showUnused: boolean;
-    renderer: (n: number | null) => string;
+    renderer: (n: number | null, bounds?: Bounds) => string;
 };
 
 export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
@@ -203,6 +203,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                             stackTrace={stackTrace} />
                             <td style={{textAlign: "center"}}>
                                 {kind}
+                                {/* IMPORTANT: do not use the bounds argument of the renderer since these ARE the bounds */}
                                 {intBounds && ` [${renderer(intBounds.min)}, ${renderer(intBounds.max)})`}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
@@ -212,11 +213,13 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                     renderer(
                                         descendantIndices.some((eiIndex) => historicChoices.has(eiIndex))
                                         ? computeOldChoice(choice, descendantIndices, historicChoices)
-                                        : choice)
+                                        : choice,
+                                        intBounds ?? undefined
+                                    )
                                 }</span>
                             </td>
                             <td style={{textAlign: "center"}}>
-                                <span>{renderer(choice)}</span>
+                                <span>{renderer(choice, intBounds ?? undefined)}</span>
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="number" value={this.newTypedChoices.get(i) ?? ""}

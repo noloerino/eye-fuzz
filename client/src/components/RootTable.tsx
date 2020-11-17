@@ -435,7 +435,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                           history={this.history} historyDepth={this.historyDepth}
                                                           historicChoices={getHistoricChoices(this.history, this.historyDepth)}
                                                           showUnused={this.showUnused}
-                                                          renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
+                                                          renderer={(n, bounds?) => n == null ? "--" : renderNumber(n, this.byteRender, bounds)}
                                                           newEiChoices={this.newEiChoices}
                                                           classNameFilter={this.classNameFilter} />
                                         : <EiByteDisplay eiTableData={this.currRunInfo.eiTableData}

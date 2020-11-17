@@ -2,17 +2,35 @@
 export enum ByteRender {
     DECIMAL = "Decimal",
     BINARY = "Binary",
-    HEX = "Hexadecimal"
+    HEX = "Hexadecimal",
+    UTF16 = "UTF-16",
 }
 
-export function renderNumber(n: number, format: ByteRender): string {
+export function renderNumber(n: number, format: ByteRender, bounds?: Bounds): string {
+    if (bounds) {
+        // When bounds exist, if bounds are not the min and max of the type (TODO check that),
+        // then n will be offset from the min, taken mod (max - min)
+        let range = bounds.max - bounds.min;
+        n %= range;
+        if (n < 0) {
+            n += range;
+        }
+        n += bounds.min;
+    }
     switch (format) {
         case ByteRender.DECIMAL:
             return n.toString();
         case ByteRender.BINARY:
             return "0b" + n.toString(2);
         case ByteRender.HEX:
+            // TODO deal with negatives
             return "0x" + n.toString(16);
+        case ByteRender.UTF16:
+            try {
+                return "'" + String.fromCodePoint(n) + "'";
+            } catch (e: any) {
+                return "<invalid codepoint 0x" + n.toString(16) + ">";
+            }
         default:
             throw new Error("Bad number format: " + format);
     }
