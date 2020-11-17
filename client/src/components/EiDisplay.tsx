@@ -160,6 +160,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
     view(vnode: Vnode<TypedDisplayAttrs, this>) {
         let eiList = vnode.attrs.eiList;
         let historicChoices = vnode.attrs.historicChoices;
+        let renderer = vnode.attrs.renderer;
         return (
             <table>
                 <thead>
@@ -168,7 +169,6 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                     <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
                     <th scope="col">Type</th>
-                    <th scope="col">Min - Max</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
                     <th scope="col">New Value</th>
@@ -179,7 +179,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                     {
                         descendantIndices,
                         kind,
-                        bounds,
+                        intBounds,
                         choice,
                         stackTrace,
                         used
@@ -203,22 +203,20 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                             stackTrace={stackTrace} />
                             <td style={{textAlign: "center"}}>
                                 {kind}
-                            </td>
-                            <td style={{textAlign: "center"}}>
-                                {bounds || "N/A"}
+                                {intBounds && ` [${renderer(intBounds.min)}, ${renderer(intBounds.max)})`}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
                                     // If the key is absent, then the value is the same as the current choice; if it
                                     // is present but null then it didn't yet exist
-                                    vnode.attrs.renderer(
+                                    renderer(
                                         descendantIndices.some((eiIndex) => historicChoices.has(eiIndex))
                                         ? computeOldChoice(choice, descendantIndices, historicChoices)
                                         : choice)
                                 }</span>
                             </td>
                             <td style={{textAlign: "center"}}>
-                                <span>{vnode.attrs.renderer(choice)}</span>
+                                <span>{renderer(choice)}</span>
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="number" value={this.newTypedChoices.get(i) ?? ""}

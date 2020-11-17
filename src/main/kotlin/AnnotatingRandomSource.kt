@@ -46,7 +46,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
      * as it also encodes information about the byte offset.
      */
     fun consumeNextTypeInfo(): ByteTypeInfo {
-        return ByteTypeInfo(currType!!, currOfs++)
+        return ByteTypeInfo(currType!!, currOfs++, currBounds)
     }
 
     private fun delegateWrapper(choiceKind: ChoiceKind, bounds: Bounds? = null): Closeable {

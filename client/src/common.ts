@@ -39,7 +39,7 @@ export type Bounds = {
 export type ByteTypeInfo = {
     kind: ChoiceKind;
     byteOffset: number;
-    bounds: Bounds | null;
+    intBounds: Bounds | null;
 };
 
 export type StackTraceLine = {
@@ -67,7 +67,7 @@ export type EiWithData = {
 export type TypedEiWithData = {
     descendantIndices: EiIndex[]; // indices of EI that are its children, in byte offset order
     kind: ChoiceKind;
-    bounds: Bounds | null;
+    intBounds: Bounds | null;
     // TODO handle byte array case
     choice: number;
     stackTrace: StackTraceLine[];
@@ -98,7 +98,7 @@ export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): Typ
             curr = {
                 descendantIndices: [],
                 kind: typeInfo.kind,
-                bounds: typeInfo.bounds,
+                intBounds: typeInfo.intBounds,
                 choice: eis[i].choice,
                 stackTrace: eis[i].stackTrace,
                 used: eis[i].used
@@ -108,5 +108,8 @@ export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): Typ
         // fine to |= because we assume those bytes haven't been filled yet
         curr!!.choice |= (eis[i].choice << (8 * typeInfo.byteOffset));
     });
+    if (curr != null) {
+        arr.push(curr);
+    }
     return arr;
 }
