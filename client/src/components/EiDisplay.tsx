@@ -222,22 +222,35 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                 <span>{renderer(choice, intBounds ?? undefined)}</span>
                             </td>
                             <td style={{textAlign: "center"}}>
-                                <input type="number" value={this.newTypedChoices.get(i) ?? ""}
-                                       oninput={(e: InputEvent) => {
-                                           let value = (e.target as HTMLInputElement)?.value ?? "";
-                                           if (value === "") {
-                                               this.newTypedChoices.delete(i);
-                                               vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex) => {
-                                                   vnode.attrs.newEiChoices.delete(eiIndex);
-                                               });
-                                           } else {
-                                               let v = parseInt(value);
-                                               this.newTypedChoices.set(i, v);
-                                               vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex, ofs) => {
-                                                   vnode.attrs.newEiChoices.set(eiIndex, getByte(v, ofs));
-                                               });
-                                           }
-                                       }}
+                                <input type="number" min={intBounds?.min} max={intBounds?.max} value={
+                                    this.newTypedChoices.get(i)
+                                        ? (this.newTypedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
+                                            : ""}
+                                        oninput={(e: InputEvent) => {
+                                            let value = (e.target as HTMLInputElement)?.value ?? "";
+                                            if (value === "") {
+                                                this.newTypedChoices.delete(i);
+                                                vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex) => {
+                                                    vnode.attrs.newEiChoices.delete(eiIndex);
+                                                });
+                                            } else {
+                                                let v = parseInt(value);
+                                                if (isNaN(v)) {
+                                                    // Treat it as unicode
+                                                    // type="number" probably prevents this though :(
+                                                    v = value.charCodeAt(0);
+                                                }
+                                                if (intBounds)  {
+                                                    // Offset by bounds - just add to min
+                                                    console.log(`getting ${v}, which will become ${v + intBounds.min}`)
+                                                    v += intBounds.min;
+                                                }
+                                                this.newTypedChoices.set(i, v);
+                                                vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex, ofs) => {
+                                                    vnode.attrs.newEiChoices.set(eiIndex, getByte(v, ofs));
+                                                });
+                                            }
+                                        }}
                                 />
                             </td>
                         </tr>
