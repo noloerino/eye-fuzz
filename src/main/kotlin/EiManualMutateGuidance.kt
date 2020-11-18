@@ -1,6 +1,6 @@
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance
 import edu.berkeley.cs.jqf.fuzz.guidance.Result
-import edu.berkeley.cs.jqf.instrument.tracing.events.*
+import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

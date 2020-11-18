@@ -27,7 +27,7 @@ enum class ChoiceKind {
 data class Bounds(val min: Int, val max: Int)
 
 /**
- * Represents type information for a byte mapped at an ExecutionIndex. The system is little endian, meaning that a
+ * Represents type information for a byte mapped at a program location. The system is little endian, meaning that a
  * byteOffset of 0 corresponds to the lowest 8 bits of an int, and similar for other data types.
  */
 @Serializable

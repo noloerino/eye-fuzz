@@ -13,8 +13,6 @@ val locList = linkedSetOf<StackTraceInfo>()
 
 typealias ChoiceMap = LinkedHashMap<StackTrace, Choice>
 
-data class LocData(val stackTrace: StackTrace, var choice: Choice)
-
 /**
  * Represents location choice data which is given back from POST/PATCH requests.
  */
@@ -23,6 +21,7 @@ data class LocFromPatch(val index: LocIndex, val choice: Choice)
 
 /**
  * Represents data for a program location (stack trace) that gets displayed on the frontend.
+ * This should be returned as part of a list, where the index in the list corresponds to the LocIndex for this element.
  */
 @Serializable
 data class LocWithData(val stackTrace: StackTrace,

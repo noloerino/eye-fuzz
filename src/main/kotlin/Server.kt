@@ -4,8 +4,6 @@ import com.sun.net.httpserver.HttpServer
 import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
-import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
-import edu.berkeley.cs.jqf.instrument.tracing.TraceLogger
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -214,15 +212,11 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     /**
-     * Serves as an entry point to the tracking of the EI call stack.
-     * Returns should probably stop tracking at generatorStub to avoid an oob exception.
+     * Runs the generator.
      */
     internal fun runGenerator() {
-        TraceLogger.get().remove()
-        SingleSnoop.setCallbackGenerator(genGuidance::generateCallBack)
-        SingleSnoop.startSnooping(GUIDANCE_STUB_FULL_NAME)
         genGuidance.reset()
-        println("Starting generator run (entp: ${SingleSnoop.entryPoints})")
+        println("Starting generator run")
         this.guidanceStub()
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
@@ -296,6 +290,7 @@ class Server<T>(private val gen: Generator<T>,
         getTargetClass(testClass.name).use {
             analyzer.analyzeClass(it, testClass.name)
         }
+        // TODO make class name array? configurable
         val compName = com.google.javascript.jscomp.Compiler::class.java.name
         getTargetClass(compName).use {
             analyzer.analyzeClass(it, compName)
@@ -475,10 +470,5 @@ class Server<T>(private val gen: Generator<T>,
             return Json.encodeToString(genGuidance.fuzzState.history)
 //            return "OK"
         }
-    }
-
-    companion object {
-        const val GUIDANCE_STUB_METHOD = "guidanceStub"
-        val GUIDANCE_STUB_FULL_NAME = "${Server::class.java.name}#$GUIDANCE_STUB_METHOD"
     }
 }
