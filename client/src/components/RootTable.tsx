@@ -1,10 +1,9 @@
 import m from "mithril";
 import { MithrilTsxComponent } from 'mithril-tsx-component';
 import "../common";
-import {ByteRender, renderNumber, ChoiceKind, EiWithData, EiIndex, addTypeInfo} from "../common";
+import {ByteRender, renderNumber, ChoiceKind, LocWithData, LocIndex, addTypeInfo, FuzzHistory} from "../common";
 import {EiByteDisplay, EiTypedDisplay} from "./EiDisplay";
 import {GenOutputDisplay} from "./GenOutputDisplay";
-import {deserializeFuzzHistory, FuzzHistory, SerializedFuzzHistory} from "../FuzzHistory";
 
 const SERVER_URL = "http://localhost:8000";
 
@@ -17,22 +16,22 @@ const storage = window.localStorage;
  * @param history
  * @param ago
  */
-function getHistoricChoices(history: FuzzHistory, ago: number): Map<EiIndex, number | null> {
+function getHistoricChoices(history: FuzzHistory, ago: number): Map<LocIndex, number | null> {
     let oldEiChoices = new Map();
     // Examine every update or create from current to (ago) creations in the past
     for (let i = 0; i < ago; i++) {
         // TODO because updates are stored BEFORE a generator run is reset, we actually need to
         // look one level deeper for updates
         let lastUpdates = history.runResults[history.runResults.length - ago - 1]?.updateChoices ?? [];
-        lastUpdates.forEach(({eiIndex, old}) => oldEiChoices.set(eiIndex, old));
+        lastUpdates.forEach(({locIndex, old}) => oldEiChoices.set(locIndex, old));
         let lastCreates = history.runResults[history.runResults.length - ago]?.createChoices ?? [];
-        lastCreates.forEach(({eiIndex}) => oldEiChoices.set(eiIndex, null));
+        lastCreates.forEach(({locIndex}) => oldEiChoices.set(locIndex, null));
     }
     return oldEiChoices;
 }
 
 type RunInfo = {
-    eiTableData: EiWithData[];
+    eiTableData: LocWithData[];
     genOutput: string;
 };
 
@@ -55,9 +54,9 @@ enum ActiveTab {
 
 export class RootTable extends MithrilTsxComponent<{ }> {
     displayTypedEi: boolean = true;
-    history: FuzzHistory = { typeInfo: [], eiList: [], runResults: [] };
+    history: FuzzHistory = { locList: [], runResults: [] };
     currRunInfo: RunInfo = { eiTableData: [], genOutput: ""};
-    newEiChoices: Map<EiIndex, number> = new Map();
+    newEiChoices: Map<LocIndex, number> = new Map();
     showUnused: boolean = true;
     byteRender: ByteRender = ByteRender.DECIMAL;
     saveFileName: string | undefined;
@@ -109,8 +108,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
 
     // Returns a promise to allow us to await on the result on this request
     updateEi(): Promise<void> {
-        let arr = Array.from(this.newEiChoices.entries()).map(([i, choice]) => ({
-            ei: this.currRunInfo.eiTableData[i].ei,
+        let arr = Array.from(this.newEiChoices.entries()).map(([index, choice]) => ({
+            index,
             choice
         }));
         this.newEiChoices.clear();
@@ -154,13 +153,13 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 method: "GET",
                 url: SERVER_URL + "/ei",
             })
-                .then((arr: EiWithData[]) => arr)
+                .then((arr: LocWithData[]) => arr)
                 .catch(e =>
                     [{ei: "ERROR " + e.message, typeInfo: ChoiceKind.BYTE, choice: 0, stackTrace: [], used: false}]
                 )
         ])
-            .then(([history, genOutput, eiData]: [SerializedFuzzHistory, string, EiWithData[]]) => {
-                this.history = deserializeFuzzHistory(history)
+            .then(([history, genOutput, eiData]: [FuzzHistory, string, LocWithData[]]) => {
+                this.history = history;
                 this.resetHistoryDepth();
                 this.currRunInfo = {
                     eiTableData: eiData,
@@ -299,7 +298,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 </label>
                                 <br />
                                 <label>
-                                    Show unused EI:{" "}
+                                    Show unused locations:{" "}
                                     <input type="checkbox" id="showUnused" checked={this.showUnused}
                                            oninput={(e: Event) => {
                                                this.showUnused = (e.target as HTMLInputElement).checked;
@@ -308,7 +307,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                 </label>
                                 <br />
                                 <label>
-                                    Filter EI by class name:{" "}
+                                    Filter stack trace by class name:{" "}
                                     <input type="text" id="classNameFilter" value={this.classNameFilter} oninput={(e: Event) => {
                                         this.classNameFilter = (e.target as HTMLInputElement).value;
                                     }}
@@ -379,9 +378,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                 url: SERVER_URL + "/load_session",
                                                 body: {fileName: loadFileName},
                                             })
-                                                .then((history: SerializedFuzzHistory) => {
+                                                .then((history: FuzzHistory) => {
                                                     console.log("Loaded session", loadFileName);
-                                                    this.history = deserializeFuzzHistory(history);
+                                                    this.history = history;
                                                     this.resetHistoryDepth();
                                                 })
                                                 .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
@@ -430,8 +429,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             <tr>
                                 <td>
                                     {this.displayTypedEi
-                                        ? <EiTypedDisplay typedData={addTypeInfo(this.history.typeInfo, this.currRunInfo.eiTableData)}
-                                                          eiList={this.history.eiList}
+                                        ? <EiTypedDisplay typedData={addTypeInfo(this.currRunInfo.eiTableData)}
+                                                          locList={this.history.locList}
                                                           history={this.history} historyDepth={this.historyDepth}
                                                           historicChoices={getHistoricChoices(this.history, this.historyDepth)}
                                                           showUnused={this.showUnused}

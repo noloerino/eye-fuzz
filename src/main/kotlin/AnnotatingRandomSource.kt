@@ -40,6 +40,17 @@ data class RandomChoiceState(
         val currBounds: Bounds? = null
 )
 
+// Stack trace is reversed (most recent, which is always Thread::getStackTrace itself, is at index 0)
+// Remove everything in this class and after guidanceStub, which is an implementation detail
+private fun getCurrentStackTrace(): StackTrace {
+    val full = Thread.currentThread().stackTrace.map { it.toLine() }
+    val randIdx = full.indexOfLast { it.className == AnnotatingRandomSource::class.java.name }
+    val stubIdx = full.indexOfFirst {
+        it.className == Server::class.java.name && it.methodName == Server.GUIDANCE_STUB_METHOD_NAME
+    }
+    return full.subList(randIdx, stubIdx)
+}
+
 // still need to implement: nextBigInteger, nextInstant, nextDuration
 class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomness(delegate) {
     // Keep track of which function actually was the top level
@@ -60,7 +71,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     private fun delegateWrapper(choiceKind: ChoiceKind, bounds: Bounds? = null): Closeable {
         if (depth == 0) {
             choiceState = RandomChoiceState(
-                    Thread.currentThread().stackTrace.map { it.toLine() },
+                    getCurrentStackTrace(),
                     choiceKind,
                     currBounds = bounds
             )

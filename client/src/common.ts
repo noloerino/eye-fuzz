@@ -54,6 +54,13 @@ export type Bounds = {
     max: number
 };
 
+export type StackTrace = StackTraceLine[];
+
+export type StackTraceInfo = {
+    stackTrace: StackTrace,
+    typeInfo: ByteTypeInfo
+};
+
 export type ByteTypeInfo = {
     kind: ChoiceKind;
     byteOffset: number;
@@ -61,29 +68,22 @@ export type ByteTypeInfo = {
 };
 
 export type StackTraceLine = {
-    callLocation: {
-        iid: number;
-        containingClass: string;
-        containingMethodName: string;
-        lineNumber: number;
-        invokedMethodName: string;
-    };
-    count: number;
+    className: string;
+    fileName: string;
+    lineNumber: number;
+    methodName: string;
 };
 
-export type ExecutionIndex = string;
+export type LocIndex = number;
 
-export type EiIndex = number;
-
-export type EiWithData = {
-    ei: number[];
+export type LocWithData = {
+    stackTraceInfo: StackTraceInfo;
     choice: number;
-    stackTrace: StackTraceLine[];
     used: boolean;
 };
 
-export type TypedEiWithData = {
-    descendantIndices: EiIndex[]; // indices of EI that are its children, in byte offset order
+export type TypedLocWithData = {
+    descendantIndices: LocIndex[]; // indices of locations that are its children, in byte offset order
     kind: ChoiceKind;
     intBounds: Bounds | null;
     // TODO handle byte array case
@@ -100,15 +100,13 @@ export function setByte(n: number, ofs: number, v: number): number {
     return n & (~(0xFF << (8 * ofs))) | (v << (8 * ofs));
 }
 
-export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): TypedEiWithData[] {
-    if (eis.length === 0) {
+export function addTypeInfo(locs: LocWithData[]): TypedLocWithData[] {
+    if (locs.length === 0) {
         return [];
     }
-    console.assert(allTypeInfo.length > 0);
-    console.assert(allTypeInfo[0].byteOffset == 0);
-    let arr: TypedEiWithData[] = [];
-    let curr: TypedEiWithData | null = null;
-    allTypeInfo.forEach((typeInfo, i) => {
+    let arr: TypedLocWithData[] = [];
+    let curr: TypedLocWithData | null = null;
+    locs.forEach(({stackTraceInfo: {stackTrace, typeInfo}, choice, used}, i) => {
         if (typeInfo.byteOffset === 0) {
             if (curr != null) {
                 arr.push(curr)
@@ -117,17 +115,39 @@ export function addTypeInfo(allTypeInfo: ByteTypeInfo[], eis: EiWithData[]): Typ
                 descendantIndices: [],
                 kind: typeInfo.kind,
                 intBounds: typeInfo.intBounds,
-                choice: eis[i].choice,
-                stackTrace: eis[i].stackTrace,
-                used: eis[i].used
+                choice,
+                stackTrace,
+                used,
             };
         }
         curr!!.descendantIndices.push(i)
         // fine to |= because we assume those bytes haven't been filled yet
-        curr!!.choice |= (eis[i].choice << (8 * typeInfo.byteOffset));
+        curr!!.choice |= (choice << (8 * typeInfo.byteOffset));
     });
     if (curr != null) {
         arr.push(curr);
     }
     return arr;
 }
+
+export type UpdateChoice = {
+    locIndex: LocIndex,
+    old: number,
+    "new": number,
+};
+
+export type CreateChoice = {
+    locIndex: LocIndex;
+    "new": number;
+};
+
+// deserialized version
+export type FuzzHistory = {
+    locList: StackTraceInfo[];
+    runResults: {
+        serializedResult: string;
+        markedUsed: LocIndex[],
+        updateChoices: UpdateChoice[],
+        createChoices: CreateChoice[],
+    }[];
+};

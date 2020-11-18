@@ -3,6 +3,9 @@ import kotlinx.serialization.Serializable
 typealias LocIndex = Int
 typealias Choice = Int
 
+@Serializable
+data class StackTraceInfo(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo)
+
 /**
  * Allows for compression of stack traces and type info by storing integer indices instead of the full data every time.
  * LinkedSet rather than a list allows efficient lookup while maintaining efficient iteration.
@@ -11,7 +14,7 @@ typealias Choice = Int
  */
 val locList = linkedSetOf<StackTraceInfo>()
 
-typealias ChoiceMap = LinkedHashMap<StackTrace, Choice>
+typealias ChoiceMap = LinkedHashMap<StackTraceInfo, Choice>
 
 /**
  * Represents location choice data which is given back from POST/PATCH requests.
@@ -24,7 +27,7 @@ data class LocFromPatch(val index: LocIndex, val choice: Choice)
  * This should be returned as part of a list, where the index in the list corresponds to the LocIndex for this element.
  */
 @Serializable
-data class LocWithData(val stackTrace: StackTrace,
+data class LocWithData(val stackTraceInfo: StackTraceInfo,
                        val choice: Choice,
                        val used: Boolean)
 

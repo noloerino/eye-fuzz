@@ -1,8 +1,17 @@
 import m, {Vnode} from "mithril";
 // Necessary to prevent mithril from getting dead code eliminated...
 const _m = m;
-import {Bounds, EiIndex, EiWithData, getByte, setByte, StackTraceLine, TypedEiWithData} from "../common";
-import {FuzzHistory} from "../FuzzHistory";
+import {
+    Bounds,
+    FuzzHistory,
+    LocIndex,
+    LocWithData,
+    StackTraceInfo,
+    StackTraceLine,
+    TypedLocWithData,
+    getByte,
+    setByte,
+} from "../common";
 import {MithrilTsxComponent} from "mithril-tsx-component";
 
 type StackTraceCellAttrs = {
@@ -22,8 +31,7 @@ class StackTraceCell extends MithrilTsxComponent<StackTraceCellAttrs> {
                 {vnode.attrs.stackTrace
                     .filter((l: StackTraceLine) => {
                         let targetClass = vnode.attrs.classNameFilter;
-                        return (l.callLocation.containingClass.indexOf(targetClass) >= 0)
-                            || (l.callLocation.invokedMethodName.indexOf(targetClass) >= 0)
+                        return (l.className.indexOf(targetClass) >= 0)
                     })
                     .map(serializeStackTraceLine).join("\n")}
             </td>
@@ -32,27 +40,18 @@ class StackTraceCell extends MithrilTsxComponent<StackTraceCellAttrs> {
 }
 
 type ByteDisplayAttrs = {
-    eiTableData: EiWithData[];
+    eiTableData: LocWithData[];
     history: FuzzHistory;
     historyDepth: number;
-    historicChoices: Map<EiIndex, number | null>;
-    newEiChoices: Map<EiIndex, number>;
+    historicChoices: Map<LocIndex, number | null>;
+    newEiChoices: Map<LocIndex, number>;
     classNameFilter: string;
     showUnused: boolean;
     renderer: (n: number | null) => string;
 };
 
 function serializeStackTraceLine(l: StackTraceLine): string {
-    let cl = l.callLocation;
-    return `(${l.count}) ${cl.containingClass}#${cl.containingMethodName}()@${cl.lineNumber} --> ${cl.invokedMethodName}`;
-}
-
-function displayEi(ei: number[]): string {
-    let eiString = "";
-    for (let i = 0; i < ei.length; i += 2) {
-        eiString += ei[i] + " (" + ei[i + 1] + ")\n"
-    }
-    return eiString;
+    return `${l.className}#${l.methodName}()@${l.lineNumber}`;
 }
 
 export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
@@ -61,9 +60,8 @@ export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
             <table>
                 <thead>
                 <tr>
-                    <th scope="col">ExecutionIndex</th>
-                    <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
+                    <th scope="col">Used</th>
                     <th scope="col">Type Info</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
@@ -72,31 +70,18 @@ export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
                 </thead>
                 <tbody id="eiTableBody">
                 {vnode.attrs.eiTableData.flatMap((
-                    {
-                        ei,
-                        stackTrace,
-                        choice,
-                        used
-                    },
+                    {stackTraceInfo: {stackTrace, typeInfo}, choice, used},
                     i
                 ) => (
                     (vnode.attrs.showUnused || used) ? [(
                         <tr>
-                            <td className="eiCell" style={{
-                                maxWidth: "10em",
-                                overflow: "scroll",
-                                textOverflow: "clip",
-                                whiteSpace: "pre-wrap"
-                            }}>
-                                {displayEi(ei)}
-                            </td>
+                            <StackTraceCell classNameFilter={vnode.attrs.classNameFilter}
+                                            stackTrace={stackTrace} />
                             <td style={{textAlign: "center"}}>
                                 <input type="checkbox" disabled={true} checked={used} />
                             </td>
-                            <StackTraceCell classNameFilter={vnode.attrs.classNameFilter}
-                                            stackTrace={stackTrace} />
                             <td>
-                                {JSON.stringify(vnode.attrs.history.typeInfo[i])}
+                                {JSON.stringify(typeInfo)}
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
@@ -132,7 +117,7 @@ export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
     }
 }
 
-function computeOldChoice(currChoice: number, descendantIndices: EiIndex[], historicChoices: Map<EiIndex, number | null>): number {
+function computeOldChoice(currChoice: number, descendantIndices: LocIndex[], historicChoices: Map<LocIndex, number | null>): number {
     let oldChoice = currChoice;
     descendantIndices.map((eiIndex, ofs) => {
         let b = historicChoices.get(eiIndex) ?? getByte(currChoice, ofs);
@@ -142,12 +127,12 @@ function computeOldChoice(currChoice: number, descendantIndices: EiIndex[], hist
 }
 
 type TypedDisplayAttrs = {
-    typedData: TypedEiWithData[];
-    eiList: number[][];
+    typedData: TypedLocWithData[];
+    locList: StackTraceInfo[];
     history: FuzzHistory;
     historyDepth: number;
-    historicChoices: Map<EiIndex, number | null>;
-    newEiChoices: Map<EiIndex, number>;
+    historicChoices: Map<LocIndex, number | null>;
+    newEiChoices: Map<LocIndex, number>;
     classNameFilter: string;
     showUnused: boolean;
     renderer: (n: number | null, bounds?: Bounds) => string;
@@ -158,16 +143,14 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
     private newTypedChoices: Map<number, number> = new Map();
 
     view(vnode: Vnode<TypedDisplayAttrs, this>) {
-        let eiList = vnode.attrs.eiList;
         let historicChoices = vnode.attrs.historicChoices;
         let renderer = vnode.attrs.renderer;
         return (
             <table>
                 <thead>
                 <tr>
-                    <th scope="col">ExecutionIndex</th>
-                    <th scope="col">Used</th>
                     <th scope="col">Stack Trace</th>
+                    <th scope="col">Used</th>
                     <th scope="col">Type</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
@@ -188,19 +171,11 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                 ) => (
                     (vnode.attrs.showUnused || used) ? [(
                         <tr>
-                            <td className="eiCell" style={{
-                                maxWidth: "10em",
-                                overflow: "scroll",
-                                textOverflow: "clip",
-                                whiteSpace: "pre-wrap"
-                            }}>
-                                {displayEi(eiList[descendantIndices[0]])}
-                            </td>
+                            <StackTraceCell classNameFilter={vnode.attrs.classNameFilter}
+                                            stackTrace={stackTrace} />
                             <td style={{textAlign: "center"}}>
                                 <input type="checkbox" disabled={true} checked={used} />
                             </td>
-                            <StackTraceCell classNameFilter={vnode.attrs.classNameFilter}
-                                            stackTrace={stackTrace} />
                             <td style={{textAlign: "center"}}>
                                 {kind}
                                 {/* IMPORTANT: do not use the bounds argument of the renderer since these ARE the bounds */}

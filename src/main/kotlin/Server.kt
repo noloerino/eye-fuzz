@@ -471,4 +471,8 @@ class Server<T>(private val gen: Generator<T>,
 //            return "OK"
         }
     }
+
+    companion object {
+        const val GUIDANCE_STUB_METHOD_NAME = "guidanceStub"
+    }
 }

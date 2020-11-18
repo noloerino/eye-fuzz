@@ -59,7 +59,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         usedThisRun.add(stackTraceInfo.stackTrace)
         currRunResult.markUsed(stackTraceInfo)
         // Attempt to get a value from the map, or else generate a random value
-        return choiceMap.computeIfAbsent(stackTraceInfo.stackTrace) {
+        return choiceMap.computeIfAbsent(stackTraceInfo) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
             // TODO handle case of repro, where this may actually be an update rather than create
             currRunResult.createChoice(stackTraceInfo, choice)
@@ -73,17 +73,14 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      */
     fun update(idx: LocIndex, choice: Int) {
         val sti = locList.elementAt(idx)
-        currRunResult.updateChoice(sti, choiceMap[sti.stackTrace]!!, choice)
-        choiceMap[sti.stackTrace] = choice
+        currRunResult.updateChoice(sti, choiceMap[sti]!!, choice)
+        choiceMap[sti] = choice
     }
     
     fun snapshot(): List<LocWithData> = choiceMap.map { (st, value) ->
-        LocWithData(st, value, st in usedThisRun)
+        LocWithData(st, value, st.stackTrace in usedThisRun)
     }
 }
-
-@Serializable
-data class StackTraceInfo(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo)
 
 /**
  * Encodes information about changes produced over the course of a run.
@@ -99,11 +96,11 @@ class RunResult {
      */
     private fun lookupOrStore(newInfo: StackTraceInfo): LocIndex {
         val idx = locList.indexOf(newInfo)
-        if (idx == -1) {
+        return if (idx == -1) {
             locList.add(newInfo)
-            return locList.size - 1
+            locList.size - 1
         } else {
-            return idx
+            idx
         }
     }
 
@@ -132,8 +129,8 @@ class RunResult {
 
     fun applyUpdate(state: FuzzState) {
         markedUsed.forEach { state.usedThisRun.add(locList.elementAt(it).stackTrace) }
-        createChoices.forEach { (i, choice) -> state.choiceMap[locList.elementAt(i).stackTrace] = choice }
-        updateChoices.forEach { (i, _, new) -> state.choiceMap[locList.elementAt(i).stackTrace] = new }
+        createChoices.forEach { (i, choice) -> state.choiceMap[locList.elementAt(i)] = choice }
+        updateChoices.forEach { (i, _, new) -> state.choiceMap[locList.elementAt(i)] = new }
     }
 
     fun copy(): RunResult {
