@@ -55,12 +55,11 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     /**
      * Adds the EI to the map if not present, and returns the choice made at this EI.
      */
-    fun add(stackTrace: StackTrace, typeInfo: ByteTypeInfo): Int {
-        val stackTraceInfo = StackTraceInfo(stackTrace, typeInfo)
-        usedThisRun.add(stackTrace)
+    fun add(stackTraceInfo: StackTraceInfo): Int {
+        usedThisRun.add(stackTraceInfo.stackTrace)
         currRunResult.markUsed(stackTraceInfo)
         // Attempt to get a value from the map, or else generate a random value
-        return choiceMap.computeIfAbsent(stackTrace) {
+        return choiceMap.computeIfAbsent(stackTraceInfo.stackTrace) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
             // TODO handle case of repro, where this may actually be an update rather than create
             currRunResult.createChoice(stackTraceInfo, choice)

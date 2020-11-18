@@ -26,7 +26,7 @@ class SessionSerializationTest {
             // create 0-2 EI
             val newEis = (0..rng.nextInt(3)).map { newStackTraceInfo() }
             eis.addAll(newEis)
-            newEis.forEach { state.add(it.stackTrace, it.typeInfo) }
+            newEis.forEach { state.add(it) }
         }
         // Make clones of the list in case some funky mutation occurs
         val originalHistory = state.history.copy(locList.toList(), state.history.runResults)

@@ -33,34 +33,43 @@ data class Bounds(val min: Int, val max: Int)
 @Serializable
 data class ByteTypeInfo(val kind: ChoiceKind, val byteOffset: Int, val intBounds: Bounds? = null)
 
+data class RandomChoiceState(
+        val stackTrace: StackTrace,
+        var currType: ChoiceKind,
+        var currOfs: Int = 0,
+        val currBounds: Bounds? = null
+)
+
 // still need to implement: nextBigInteger, nextInstant, nextDuration
 class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomness(delegate) {
     // Keep track of which function actually was the top level
     var depth = 0
-    private var currType: ChoiceKind? = null
-    var currOfs: Int = 0
-    var currBounds: Bounds? = null
+    private var choiceState: RandomChoiceState? = null
 
     /**
-     * Returns an object representing type information for the last retrieved byte. This function is not idempotent,
-     * as it also encodes information about the byte offset.
+     * Returns an object representing type information for the last retrieved byte.
+     *
+     * This function is not idempotent, as it also updates information about the byte offset.
+     * For example, it may be called 4 times for generating an Int (once for each possible byte offset).
      */
-    fun consumeNextTypeInfo(): ByteTypeInfo {
-        return ByteTypeInfo(currType!!, currOfs++, currBounds)
+    fun consumeNextStackTraceInfo(): StackTraceInfo {
+        val s = choiceState!!
+        return StackTraceInfo(s.stackTrace, ByteTypeInfo(s.currType, s.currOfs++, s.currBounds))
     }
 
     private fun delegateWrapper(choiceKind: ChoiceKind, bounds: Bounds? = null): Closeable {
         if (depth == 0) {
-            currType = choiceKind
-            currBounds = bounds
+            choiceState = RandomChoiceState(
+                    Thread.currentThread().stackTrace.map { it.toLine() },
+                    choiceKind,
+                    currBounds = bounds
+            )
         }
         depth++
         return Closeable {
             depth--
             if (depth == 0) {
-                currOfs = 0
-                currType = null
-                currBounds = null
+                choiceState = null
             }
         }
     }

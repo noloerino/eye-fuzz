@@ -99,11 +99,6 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     }
 
     /**
-     T the full stack trace of the current state.
-     */
-    fun getFullStackTrace(): List<StackTraceLine> = Thread.currentThread().stackTrace.map { it.toLine() }
-
-    /**
      * When this object is not in repro mode (invoked through `reproWithFile`), this will read existing bytes from
      * the choice map and generate new bytes as necessary. In repro mode, this will read the next byte in the passed
      * in iterator.
@@ -112,9 +107,9 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
         return object : InputStream() {
             override fun read(): Int {
                 check(!isInCollectMode) { "Illegal attempt to request bytes while in coverage collection mode" }
-                val stackTrace = getFullStackTrace()
-                log("\tREAD $stackTrace")
-                return fuzzState.add(stackTrace, annotatingRandomSource!!.consumeNextTypeInfo())
+                val info = annotatingRandomSource!!.consumeNextStackTraceInfo()
+                log("\tREAD $info")
+                return fuzzState.add(info)
             }
         }
     }
