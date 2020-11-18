@@ -1,11 +1,8 @@
-import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.util.*
 
 @Serializable
-data class FuzzHistory(val allTypeInfo: List<ByteTypeInfo>, val eiList: List<CompressedEiKey>, val runResults: List<RunResult>)
+data class FuzzHistory(val locList: List<StackTraceInfo>, val runResults: List<RunResult>)
 
 class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
     /**
@@ -14,9 +11,9 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      * Since EIs are unique (as visiting the same location twice would result in an incremented count),
      * we're able to use a LinkedSet instead of an ordinary list.
      */
-    val usedThisRun = linkedSetOf<ExecutionIndex>()
-    var eiMap = linkedMapOf<ExecutionIndex, EiData>()
-    val mapSize get() = eiMap.size
+    val usedThisRun = linkedSetOf<StackTrace>()
+    var choiceMap: ChoiceMap = linkedMapOf()
+    val mapSize get() = choiceMap.size
 
     /**
      * Each element in the list contains the sequence of diffs incurred over the course of a single generator run.
@@ -31,8 +28,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
 
     // hides mutability of diffs, and remove first sentinel node
     val history: FuzzHistory get() {
-        assert(allTypeInfo.size == eiList.size) { "Type info and EI list sizes differed" }
-        return FuzzHistory(allTypeInfo, eiList, diffStack)
+        return FuzzHistory(locList.toList(), diffStack)
     }
 
     fun resetForNewRun() {
@@ -41,15 +37,15 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
 
     fun clear() {
-        eiMap.clear()
+        choiceMap.clear()
         usedThisRun.clear()
         diffStack.clear()
-        eiList.clear()
+        locList.clear()
     }
 
     fun reloadFromHistory(newHistory: FuzzHistory) {
         clear()
-        eiList.addAll(newHistory.eiList)
+        locList.addAll(newHistory.locList)
         newHistory.runResults.forEach { runResult ->
             diffStack.add(runResult)
             runResult.applyUpdate(this)
@@ -59,42 +55,36 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     /**
      * Adds the EI to the map if not present, and returns the choice made at this EI.
      */
-    fun add(ei: ExecutionIndex, typeInfo: ByteTypeInfo): Int {
-        usedThisRun.add(ei)
-        val stackTrace = guidance.getFullStackTrace()
-        currRunResult.markUsed(ei, stackTrace)
+    fun add(stackTrace: StackTrace, typeInfo: ByteTypeInfo): Int {
+        val stackTraceInfo = StackTraceInfo(stackTrace, typeInfo)
+        usedThisRun.add(stackTrace)
+        currRunResult.markUsed(stackTraceInfo)
         // Attempt to get a value from the map, or else generate a random value
-        return eiMap.computeIfAbsent(ei) {
+        return choiceMap.computeIfAbsent(stackTrace) {
             val choice = guidance.reproValues?.next() ?: rng.nextInt(256)
             // TODO handle case of repro, where this may actually be an update rather than create
-            currRunResult.createChoice(ei, stackTrace, choice, typeInfo)
-            EiData(guidance.getFullStackTrace(), choice)
-        }.choice
+            currRunResult.createChoice(stackTraceInfo, choice)
+            choice
+        }
     }
 
     /**
-     * Updates the choice corresponding to the EI with this value.
+     * Updates the choice corresponding to the stack trace with this value.
+     * Because this is exposed to the HTTP API, it takes an index as argument.
      */
-    fun update(ei: ExecutionIndex, choice: Int) {
-        currRunResult.updateChoice(ei, guidance.getFullStackTrace(), eiMap[ei]!!.choice, choice)
-        eiMap[ei]!!.choice = choice
+    fun update(idx: LocIndex, choice: Int) {
+        val sti = locList.elementAt(idx)
+        currRunResult.updateChoice(sti, choiceMap[sti.stackTrace]!!, choice)
+        choiceMap[sti.stackTrace] = choice
     }
     
-    fun snapshot(): List<EiWithData> = eiMap.map { (ei, value) ->
-        EiWithData(ei, value.stackTrace, value.choice, ei in usedThisRun)
+    fun snapshot(): List<LocWithData> = choiceMap.map { (st, value) ->
+        LocWithData(st, value, st in usedThisRun)
     }
 }
 
-typealias EiIndex = Int
-
 @Serializable
-data class CompressedEiKey(val ei: SerializableEi, val stackTrace: StackTrace)
-
-/**
- * Allows for compression of EIs by storing integer indices instead of the full EI.
- */
-val eiList: MutableList<CompressedEiKey> = mutableListOf()
-val allTypeInfo = mutableListOf<ByteTypeInfo>()
+data class StackTraceInfo(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo)
 
 /**
  * Encodes information about changes produced over the course of a run.
@@ -106,49 +96,45 @@ val allTypeInfo = mutableListOf<ByteTypeInfo>()
 @Serializable
 class RunResult {
     /**
-     * Looks up the int associated with a particular EI, assigning a new one if necessary.
+     * Looks up the int associated with a particular stack trace, assigning a new one if necessary.
      */
-    private fun lookupOrStore(ei: ExecutionIndex, stackTrace: StackTrace): EiIndex {
-        for ((i, compressedEiKey) in eiList.withIndex()) {
-            if (ei == compressedEiKey.ei) {
-                return i
-            }
+    private fun lookupOrStore(newInfo: StackTraceInfo): LocIndex {
+        val idx = locList.indexOf(newInfo)
+        if (idx == -1) {
+            locList.add(newInfo)
+            return locList.size - 1
+        } else {
+            return idx
         }
-        eiList.add(CompressedEiKey(ei, stackTrace))
-        return eiList.size - 1
     }
 
     @Serializable
-    data class UpdateChoice(val eiIndex: EiIndex, val old: Int, val new: Int)
+    data class UpdateChoice(val locIndex: LocIndex, val old: Int, val new: Int)
 
     @Serializable
-    data class CreateChoice(val eiIndex: EiIndex, val new: Int)
+    data class CreateChoice(val locIndex: LocIndex, val new: Int)
 
     var serializedResult: String = ""
-    private val markedUsed = mutableSetOf<EiIndex>()
+    private val markedUsed = mutableSetOf<LocIndex>()
     private val createChoices = mutableListOf<CreateChoice>()
     private val updateChoices = mutableListOf<UpdateChoice>()
 
-    fun markUsed(ei: ExecutionIndex, stackTrace: StackTrace) {
-        markedUsed.add(lookupOrStore(ei, stackTrace))
+    fun markUsed(stackTraceInfo: StackTraceInfo) {
+        markedUsed.add(lookupOrStore(stackTraceInfo))
     }
 
-    fun updateChoice(ei: ExecutionIndex, stackTrace: StackTrace, old: Int, choice: Int) {
-        updateChoices.add(UpdateChoice(lookupOrStore(ei, stackTrace), old, choice))
+    fun updateChoice(stackTraceInfo: StackTraceInfo, old: Int, choice: Int) {
+        updateChoices.add(UpdateChoice(lookupOrStore(stackTraceInfo), old, choice))
     }
 
-    fun createChoice(ei: ExecutionIndex, stackTrace: StackTrace, choice: Int, typeInfo: ByteTypeInfo) {
-        val ind = CreateChoice(lookupOrStore(ei, stackTrace), choice)
-        createChoices.add(ind)
-        allTypeInfo.add(ind.eiIndex, typeInfo)
+    fun createChoice(stackTraceInfo: StackTraceInfo, choice: Int) {
+        createChoices.add(CreateChoice(lookupOrStore(stackTraceInfo), choice))
     }
 
     fun applyUpdate(state: FuzzState) {
-        markedUsed.forEach { state.usedThisRun.add(eiList[it].ei) }
-        createChoices.forEach {
-            (i, choice) -> state.eiMap[eiList[i].ei] = EiData(eiList[i].stackTrace, choice)
-        }
-        updateChoices.forEach { (i, old, new) -> state.eiMap[eiList[i].ei]!!.choice = new }
+        markedUsed.forEach { state.usedThisRun.add(locList.elementAt(it).stackTrace) }
+        createChoices.forEach { (i, choice) -> state.choiceMap[locList.elementAt(i).stackTrace] = choice }
+        updateChoices.forEach { (i, _, new) -> state.choiceMap[locList.elementAt(i).stackTrace] = new }
     }
 
     fun copy(): RunResult {

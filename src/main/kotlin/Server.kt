@@ -1,11 +1,8 @@
 import com.pholser.junit.quickcheck.generator.GenerationStatus
 import com.pholser.junit.quickcheck.generator.Generator
 import com.sun.net.httpserver.HttpServer
-import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
 import edu.berkeley.cs.jqf.fuzz.guidance.Result
 import edu.berkeley.cs.jqf.fuzz.guidance.StreamBackedRandom
-import edu.berkeley.cs.jqf.fuzz.guidance.TimeoutException
-import edu.berkeley.cs.jqf.fuzz.junit.TrialRunner
 import edu.berkeley.cs.jqf.fuzz.junit.quickcheck.NonTrackingGenerationStatus
 import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.TraceLogger
@@ -21,8 +18,6 @@ import org.jacoco.core.data.SessionInfoStore
 import org.jacoco.core.instr.Instrumenter
 import org.jacoco.core.runtime.LoggerRuntime
 import org.jacoco.core.runtime.RuntimeData
-import org.junit.AssumptionViolatedException
-import org.junit.runners.model.FrameworkMethod
 import java.io.BufferedReader
 import java.io.File
 import java.net.InetSocketAddress
@@ -154,9 +149,9 @@ class Server<T>(private val gen: Generator<T>,
     private val testClass = Class.forName(testClassName)
     val mainThread: Thread = Thread.currentThread()
 
-    /** Tracks the random value stored at an EI, as well as the last line of the stack trace  */
+    /** Tracks the random value stored at a choice, as well as the last line of the stack trace  */
     private val rng = Random()
-    internal val genGuidance = EiManualMutateGuidance(rng, mainThread)
+    internal val genGuidance = EiManualMutateGuidance(rng)
 
     /** The result of the last test case run */
     var testResult: org.junit.runner.Result? = null
@@ -178,9 +173,9 @@ class Server<T>(private val gen: Generator<T>,
              */
             override fun onPatch(reader: BufferedReader): String {
                 val text = reader.readText()
-                val arr = Json.decodeFromString<List<EiWithoutStackTrace>>(text)
+                val arr = Json.decodeFromString<List<LocFromPatch>>(text)
                 for (e in arr) {
-                    genGuidance.fuzzState.update(e.ei, e.choice)
+                    genGuidance.fuzzState.update(e.index, e.choice)
                 }
                 return "OK"
             }
@@ -344,7 +339,7 @@ class Server<T>(private val gen: Generator<T>,
                 lastTestResult,
                 // Need to filter to ensure size not too large
                 genGuidance.lastRunTestCov.toSet()
-                        .map { EiManualMutateGuidance.eventToString(it) }
+                        .map { "TODO" } // TODO
                         .filter { it.contains(testClass.name) }
         )
     }

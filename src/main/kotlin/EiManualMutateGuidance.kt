@@ -1,8 +1,5 @@
-import edu.berkeley.cs.jqf.fuzz.ei.ExecutionIndex
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance
-import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException
 import edu.berkeley.cs.jqf.fuzz.guidance.Result
-import edu.berkeley.cs.jqf.instrument.tracing.SingleSnoop
 import edu.berkeley.cs.jqf.instrument.tracing.events.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -12,7 +9,6 @@ import java.io.File
 import java.io.InputStream
 import java.util.*
 import java.util.function.Consumer
-import kotlin.collections.LinkedHashMap
 
 enum class GuidanceMode {
     GENERATE_INPUT,
@@ -21,19 +17,21 @@ enum class GuidanceMode {
 }
 
 /**
- * A more transparent version of ExecutionIndexingGuidance that also doubles as a repro guidance and also a collector
- * of test coverage, because there's some funky thread stuff going on.
+ * A modified version of ExecutionIndexingGuidance that doesn't use ExecutionIndex. Go figure.
+ *
+ * ExecutionIndex is eschewed in favor of java.lang.Thread.getCurrentStackTrace, which is more reliable for our purposes
+ * because we don't specifically need EI, and need to leave ASM out of -Xbootclasspath in order to allow Jacoco to
+ * instrument and collect coverage on the fly.
+ *
+ * This class also doubles as a repro guidance and also a collector of test coverage, because there's some funky
+ * thread stuff going on.
  */
-class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guidance {
+class EiManualMutateGuidance(rng: Random) : Guidance {
 
     // TODO find less hacky way to access
     var annotatingRandomSource: AnnotatingRandomSource? = null
 
-    private var lastEvent: TraceEvent? = null
-    /** The EI stack trace for generator runs */
-    private var genEiState = EiState()
-    /** The EI stack trace for test coverage runs */
-    private var collectEiState = EiState()
+    // TODO change cov type
     val lastRunTestCov = mutableSetOf<TraceEvent>()
 
     private var mode = GuidanceMode.GENERATE_INPUT
@@ -44,13 +42,13 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
     val history: FuzzHistory by fuzzState::history
 
     /**
-     * During a repro run, the original EI map is saved here. Any values that did not appear in the repro EI run
+     * During a repro run, the original choice map is saved here. Any values that did not appear in the choice run
      * are thereby preserved for diffing purposes.
      *
      * Outside a repro run, this should be null. Moving the original map to here instead of making this the repro map
      * and performing a null check hopefully saves cycles, although maybe the JIT would've saved them anyway.
      */
-    private var reproBackupEiMap: LinkedHashMap<ExecutionIndex, EiData>? = null
+    private var reproBackupChoiceMap: ChoiceMap? = null
 
     /**
      * A stream of integers that will be consumed to fill values in the EI map.
@@ -71,14 +69,14 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
     fun reproWithFile(file: File): Closeable {
         this.reset()
         mode = GuidanceMode.REPRO_FILE
-        reproBackupEiMap = fuzzState.eiMap
-        fuzzState.eiMap = linkedMapOf()
+        reproBackupChoiceMap = fuzzState.choiceMap
+        fuzzState.choiceMap = linkedMapOf()
         reproValues = file.readBytes().asSequence().map { it.toInt() and 0xFF }.iterator()
         return Closeable {
-            // Careful with ordering here - we want the new EI map to override the values in the backed up map
-            reproBackupEiMap!!.putAll(fuzzState.eiMap)
-            fuzzState.eiMap = reproBackupEiMap!!
-            reproBackupEiMap = null
+            // Careful with ordering here - we want the new choice map to override the values in the backed up map
+            reproBackupChoiceMap!!.putAll(fuzzState.choiceMap)
+            fuzzState.choiceMap = reproBackupChoiceMap!!
+            reproBackupChoiceMap = null
             reproValues = null
             mode = GuidanceMode.GENERATE_INPUT
         }
@@ -88,7 +86,6 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
      * Sets the guidance to do nothing but collect test coverage; no inputs should ever be generated in this mode.
      */
     fun collectTestCov(): Closeable {
-        collectEiState = EiState()
         lastRunTestCov.clear()
         mode = GuidanceMode.COLLECT_COV
         return Closeable {
@@ -97,38 +94,27 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
     }
 
     fun reset() {
-        genEiState = EiState()
         hasRun = false
         fuzzState.resetForNewRun()
     }
 
     /**
-     * the full stack trace of the current EI state
-     * should be invoked after getExecutionIndex was called on lastEvent
+     T the full stack trace of the current state.
      */
-    fun getFullStackTrace(): List<StackTraceLine> = (0 until genEiState.depth + 1).map { i ->
-        val iid = genEiState.rollingIndex[2 * i]
-        val count = genEiState.rollingIndex[2 * i + 1]
-        val callLocation = callLocations[iid]!!
-        StackTraceLine(callLocation, count)
-    }
+    fun getFullStackTrace(): List<StackTraceLine> = Thread.currentThread().stackTrace.map { it.toLine() }
 
     /**
      * When this object is not in repro mode (invoked through `reproWithFile`), this will read existing bytes from
-     * the EI map and generate new bytes as necessary. In repro mode, this will read the next byte in the passed
+     * the choice map and generate new bytes as necessary. In repro mode, this will read the next byte in the passed
      * in iterator.
      */
     override fun getInput(): InputStream {
         return object : InputStream() {
             override fun read(): Int {
-                if (lastEvent == null) {
-                    throw GuidanceException("Could not compute execution index; no instrumentation?")
-                }
                 check(!isInCollectMode) { "Illegal attempt to request bytes while in coverage collection mode" }
-                // Get the execution index of the last event
-                val executionIndex = genEiState.getExecutionIndex(lastEvent!!)
-                log("\tREAD " + eventToString(lastEvent!!))
-                return fuzzState.add(executionIndex, annotatingRandomSource!!.consumeNextTypeInfo())
+                val stackTrace = getFullStackTrace()
+                log("\tREAD $stackTrace")
+                return fuzzState.add(stackTrace, annotatingRandomSource!!.consumeNextTypeInfo())
             }
         }
     }
@@ -142,9 +128,8 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
     }
 
     override fun generateCallBack(thread: Thread): Consumer<TraceEvent> {
-        require(appThread == thread) { "Guidance must stay on the same thread" }
-        SingleSnoop.entryPoints[thread] ?: throw IllegalStateException("Guidance must be able to determine entry point")
-        return Consumer { e: TraceEvent -> handleEvent(e) }
+        // Do nothing lol
+        return Consumer {}
     }
 
     private fun log(msg: String) {
@@ -152,40 +137,6 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
             println(msg)
         }
     }
-
-    private var isTracking = false
-    private fun handleEvent(e: TraceEvent) {
-        // Needed to cache stack traces
-        val contents = eventToString(e)
-        when (e) {
-            is CallEvent -> {
-                if (e.containingMethodName == Server.GUIDANCE_STUB_METHOD) {
-                    isTracking = true
-                }
-                val trackedString = if (isTracking) "*tracked" else "untracked"
-                log("CALL $trackedString: $contents")
-            }
-            is ReturnEvent -> {
-                if (contents.contains(Server.GUIDANCE_STUB_FULL_NAME)) {
-                    isTracking = false
-                }
-                val trackedString = if (isTracking) "*tracked" else "untracked"
-                log("RET $trackedString: $contents")
-            }
-            else -> {
-                val trackedString = if (isTracking) "*tracked" else "untracked"
-                log("OTHER $trackedString: $contents")
-            }
-        }
-        if (isTracking) {
-            e.applyVisitor(if (isInCollectMode) { collectEiState } else { genEiState })
-            if (isInCollectMode) {
-                lastRunTestCov.add(e)
-            }
-        }
-        lastEvent = e
-    }
-
     /**
      * Produces the sequence of bytes produced by the most recent input.
      *
@@ -193,7 +144,7 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
      * simply produces all the bytes in the order that they were requested.
      */
     private fun getLastRunBytes(): ByteArray {
-        return fuzzState.usedThisRun.map { k -> fuzzState.eiMap[k]!!.choice.toByte() }.toByteArray()
+        return fuzzState.usedThisRun.map { k -> fuzzState.choiceMap[k]!!.toByte() }.toByteArray()
     }
 
     fun writeLastRun(dest: File) {
@@ -212,43 +163,5 @@ class EiManualMutateGuidance(rng: Random, private val appThread: Thread) : Guida
 
     companion object {
         private const val verbose = false
-
-        @JvmField
-        val eventStrings: MutableMap<Int, String> = mutableMapOf()
-
-        @JvmField
-        val callLocations: MutableMap<Int, CallLocation> = mutableMapOf()
-
-        @JvmStatic
-        fun eventToString(e: TraceEvent): String {
-            return eventStrings.computeIfAbsent(e.iid) {
-                when (e) {
-                    is BranchEvent -> {
-                        String.format("(branch) %s#%s()@%d [%d]", e.containingClass, e.containingMethodName,
-                                e.lineNumber, e.arm)
-                    }
-                    is CallEvent -> {
-                        callLocations.computeIfAbsent(e.iid) {
-                            CallLocation(e.iid, e.containingClass, e.containingMethodName, e.lineNumber, e.invokedMethodName)
-                        }
-                        String.format("(call) %s#%s()@%d --> %s", e.containingClass, e.containingMethodName,
-                                e.lineNumber, e.invokedMethodName)
-                    }
-                    is ReturnEvent -> {
-                        "(return) ${e.containingClass}#${e.containingMethodName}"
-                    }
-                    is AllocEvent -> {
-                        "(alloc) size ${e.size} ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
-                    }
-                    is ReadEvent -> {
-                        "(read) ${e.field} in ${e.containingClass}#${e.containingMethodName}()@${e.lineNumber}"
-                    }
-                    else -> {
-                        String.format("(other) %s#%s()@%d", e.containingClass, e.containingMethodName, e.lineNumber)
-                    }
-                }
-            }
-        }
-
     }
 }
