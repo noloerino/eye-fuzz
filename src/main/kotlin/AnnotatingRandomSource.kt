@@ -138,11 +138,11 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
         return delegateWrapper(ChoiceKind.LONG).use { super.nextLong(min, max) }
     }
 
-    override fun <T : Any?> choose(items: Array<out T>?): T {
-        return delegateWrapper(ChoiceKind.CHOOSE).use { super.choose(items) }
+    override fun <T : Any?> choose(items: Array<out T>): T {
+        return delegateWrapper(ChoiceKind.CHOOSE, Bounds(0, items.size)).use { super.choose(items) }
     }
 
-    override fun <T : Any?> choose(items: MutableCollection<T>?): T {
-        return delegateWrapper(ChoiceKind.CHOOSE).use { super.choose(items) }
+    override fun <T : Any?> choose(items: MutableCollection<T>): T {
+        return delegateWrapper(ChoiceKind.CHOOSE, Bounds(0, items.size)).use { super.choose(items) }
     }
 }
