@@ -20,8 +20,7 @@
         <dependency>
             <groupId>org.jacoco</groupId>
             <artifactId>org.jacoco.core</artifactId>
-            <!-- Downgrade needed to avoid some "Unsupported api" message with asm library -->
-            <version>0.8.1</version>
+            <version>0.8.6</version>
         </dependency>
         <!-- Google Closure: we want to test this library -->
         <dependency>
@@ -41,39 +40,20 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Some random dependencies of JQF -->
-<!--        <dependency>-->
-<!--            <groupId>org.jgrapht</groupId>-->
-<!--            <artifactId>jgrapht-core</artifactId>-->
-<!--            <version>1.0.1</version>-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>org.jacoco</groupId>-->
-<!--            <artifactId>org.jacoco.report</artifactId>-->
-<!--            <version>0.8.2</version>-->
-<!--        </dependency>-->
-        <!-- End random dependencies -->
-
         <!-- JQF: test dependency for @Fuzz annotation -->
         <dependency>
             <groupId>edu.berkeley.cs.jqf</groupId>
             <artifactId>jqf-fuzz</artifactId>
-<!--            <scope>system</scope>-->
-<!--            <systemPath>${project.basedir}/../JQF/fuzz/target/jqf-fuzz-1.6-SNAPSHOT.jar</systemPath>-->
             <version>1.6</version>
         </dependency>
         <dependency>
             <groupId>edu.berkeley.cs.jqf</groupId>
             <artifactId>jqf-examples</artifactId>
-<!--            <scope>system</scope>-->
-<!--            <systemPath>${project.basedir}/../JQF/examples/target/jqf-examples-1.6-SNAPSHOT.jar</systemPath>-->
             <version>1.6</version>
         </dependency>
         <dependency>
             <groupId>edu.berkeley.cs.jqf</groupId>
             <artifactId>jqf-instrument</artifactId>
-<!--            <scope>system</scope>-->
-<!--            <systemPath>${project.basedir}/../JQF/instrument/target/jqf-instrument-1.6-SNAPSHOT.jar</systemPath>-->
             <version>1.6</version>
         </dependency>
 
