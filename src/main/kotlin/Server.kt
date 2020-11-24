@@ -16,8 +16,13 @@ import org.jacoco.core.data.SessionInfoStore
 import org.jacoco.core.instr.Instrumenter
 import org.jacoco.core.runtime.LoggerRuntime
 import org.jacoco.core.runtime.RuntimeData
-import java.io.BufferedReader
-import java.io.File
+import org.jacoco.core.tools.ExecFileLoader
+import org.jacoco.report.DirectorySourceFileLocator
+import org.jacoco.report.FileMultiReportOutput
+import org.jacoco.report.InputStreamSourceFileLocator
+import org.jacoco.report.csv.CSVFormatter
+import org.jacoco.report.html.HTMLFormatter
+import java.io.*
 import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
@@ -240,48 +245,36 @@ class Server<T>(private val gen: Generator<T>,
         }
     }
 
+    var testResultStream: ByteArrayOutputStream = ByteArrayOutputStream()
+
     /**
      * Runs a test case and obtains coverage for it through Jacoco.
      */
     fun runTestCase() {
+        // Reinitialize stream
+        testResultStream = ByteArrayOutputStream()
         fun getTargetClass(targetName: String) = this::class.java
                 .getResourceAsStream("/${targetName.replace('.', '/')}.class")
         println("Starting Jacoco test case run")
-        // https://www.jacoco.org/jacoco/trunk/doc/examples/java/CoreTutorial.java
-        // Unlike the example, we need to target a wrapper class for runnable
         val targetName = TestWrapper::class.java.name
-        val runtime = LoggerRuntime()
-        // Create modified class with instrumentation
-        val instr = Instrumenter(runtime)
-        val instrumented: ByteArray = getTargetClass(targetName).use {
-            instr.instrument(it, targetName)
-        }
-        // Run instrumented class
-        val data = RuntimeData()
-        val memoryClassLoader = MemoryClassLoader()
-        memoryClassLoader.addDefinition(targetName, instrumented)
-        val targetClass: Class<*> = memoryClassLoader.loadClass(targetName)
-        // Execute class
-        val targetInstance = targetClass.newInstance() as Runnable
-        fun setTargetField(fieldName: String, value: Any) {
-            val field = targetInstance.javaClass.getDeclaredField(fieldName)
-            field.isAccessible = true
-            field.set(targetInstance, value)
-        }
-//        println("declared fields: ${targetInstance.javaClass.declaredFields.map { it.name }}")
-        setTargetField("genOutput", genGuidance.fuzzState.genOutput)
-        setTargetField("testClass", testClass)
-        setTargetField("testMethod", testMethod)
-        targetInstance.run()
-        lastTestResult = targetInstance.javaClass.getField("lastTestResult").get(targetInstance) as Result
+        // TODO make class name array? configurable
+        val compName = com.google.javascript.jscomp.Compiler::class.java.name
+        val testWrapper = TestWrapper()
+        testWrapper.genOutput = genGuidance.fuzzState.genOutput
+        testWrapper.testClass = testClass
+        testWrapper.testMethod = testMethod
+        testWrapper.run()
+        lastTestResult = testWrapper.lastTestResult
         println("test result: $lastTestResult")
-        // Collect data and end runtime
-        val executionData = ExecutionDataStore()
-        val sessionInfos = SessionInfoStore()
-        data.collect(executionData, sessionInfos, false)
-        println("exec data: ${executionData.contents.map { it.name }}")
-        runtime.shutdown()
-        // Get coverage on test target, not runnable wrapper
+        // https://github.com/rohanpadhye/JQF/blob/master/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/repro/ReproGuidance.java
+        val agent = Class.forName("org.jacoco.agent.rt.RT")
+                .getMethod("getAgent")
+                .invoke(null)
+        val execData: ByteArray = agent.javaClass.getMethod("getExecutionData", Boolean::class.java)
+                .invoke(agent, false) as ByteArray
+        val loader = ExecFileLoader()
+        loader.load(ByteArrayInputStream(execData))
+        val executionData = loader.executionDataStore
         val coverageBuilder = CoverageBuilder()
         val analyzer = Analyzer(executionData, coverageBuilder)
         getTargetClass(targetName).use {
@@ -290,38 +283,41 @@ class Server<T>(private val gen: Generator<T>,
         getTargetClass(testClass.name).use {
             analyzer.analyzeClass(it, testClass.name)
         }
-        // TODO make class name array? configurable
-        val compName = com.google.javascript.jscomp.Compiler::class.java.name
         getTargetClass(compName).use {
             analyzer.analyzeClass(it, compName)
         }
+
+        // https://www.jacoco.org/jacoco/trunk/doc/examples/java/ReportGenerator.java
+        val csvFormatter = CSVFormatter()
+        val visitor = csvFormatter.createVisitor(testResultStream)
+        visitor.visitBundle(coverageBuilder.getBundle("eye-fuzz"), null)
+        visitor.visitEnd()
+
         // Dump coverage info
-        fun printCounter(unit: String, counter: ICounter) {
-            val missed = counter.missedCount
-            val total = counter.totalCount
-            println("> $missed of $total $unit missed")
-        }
-        println("no match: ${coverageBuilder.noMatchClasses}")
-        for (cc in coverageBuilder.classes) {
-            println("Coverage of class ${cc.name}")
-            printCounter("instructions", cc.instructionCounter)
-            printCounter("branches", cc.branchCounter)
-            printCounter("lines", cc.lineCounter)
-            printCounter("methods", cc.methodCounter)
-            printCounter("complexity", cc.complexityCounter)
-            /*
-            for (i in cc.firstLine..cc.lastLine) {
-                val statStr = when (cc.getLine(i).status) {
-                    ICounter.NOT_COVERED -> "red"
-                    ICounter.PARTLY_COVERED -> "yellow"
-                    ICounter.FULLY_COVERED -> "green"
-                    else -> "???"
-                }
-                println("Line $i: $statStr")
-            }
-            */
-        }
-        println("Finished test case run")
+//        fun printCounter(unit: String, counter: ICounter) {
+//            val missed = counter.missedCount
+//            val total = counter.totalCount
+//            println("> $missed of $total $unit missed")
+//        }
+//        println("no match: ${coverageBuilder.noMatchClasses}")
+//        for (cc in coverageBuilder.classes) {
+//            println("Coverage of class ${cc.name}")
+//            printCounter("instructions", cc.instructionCounter)
+//            printCounter("branches", cc.branchCounter)
+//            printCounter("lines", cc.lineCounter)
+//            printCounter("methods", cc.methodCounter)
+//            printCounter("complexity", cc.complexityCounter)
+//            for (i in cc.firstLine..cc.lastLine) {
+//                val statStr = when (cc.getLine(i).status) {
+//                    ICounter.NOT_COVERED -> "red"
+//                    ICounter.PARTLY_COVERED -> "yellow"
+//                    ICounter.FULLY_COVERED -> "green"
+//                    else -> "???"
+//                }
+//                println("Line $i: $statStr")
+//            }
+//        }
+//        println("Finished test case run")
     }
 
     private fun getGenContents(): String {
@@ -330,13 +326,7 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     private fun getTestCaseCov(): TestCovResult {
-        return TestCovResult(
-                lastTestResult,
-                // Need to filter to ensure size not too large
-                genGuidance.lastRunTestCov.toSet()
-                        .map { "TODO" } // TODO
-                        .filter { it.contains(testClass.name) }
-        )
+        return TestCovResult(lastTestResult, String(testResultStream.toByteArray()))
     }
 
     /**

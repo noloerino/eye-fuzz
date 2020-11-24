@@ -44,7 +44,7 @@ enum TestStatus {
 
 type TestCov = {
     status: TestStatus;
-    events: string[];
+    cov: string;
 };
 
 enum ActiveTab {
@@ -65,7 +65,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     loadSessionName: string | undefined;
     availableLoadFiles: string[] | undefined;
     availableLoadSessions: string[] | undefined;
-    testCov: TestCov = {status: TestStatus.INVALID, events: []};
+    testCov: TestCov = {status: TestStatus.INVALID, cov: ""};
 
     /**
      * The number of steps back in the history to display; 0 means the most recent set of values is displayed,
@@ -460,7 +460,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         <>
                             <span><b>Status:</b> {this.testCov.status}</span>
                             <table>
-                                {this.testCov.events.map((line: string) => <tr><td>{line}</td></tr>)}
+                                {this.testCov.cov.split("\n").map(
+                                    row => <tr>{row.split(",").map(e => <td>{e}</td>)}</tr>)
+                                }
                             </table>
                         </>
                     )

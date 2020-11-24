@@ -27,12 +27,7 @@ enum class GuidanceMode {
  * thread stuff going on.
  */
 class EiManualMutateGuidance(rng: Random) : Guidance {
-
-    // TODO find less hacky way to access
     var annotatingRandomSource: AnnotatingRandomSource? = null
-
-    // TODO change cov type
-    val lastRunTestCov = mutableSetOf<TraceEvent>()
 
     private var mode = GuidanceMode.GENERATE_INPUT
 
@@ -86,7 +81,6 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
      * Sets the guidance to do nothing but collect test coverage; no inputs should ever be generated in this mode.
      */
     fun collectTestCov(): Closeable {
-        lastRunTestCov.clear()
         mode = GuidanceMode.COLLECT_COV
         return Closeable {
             mode = GuidanceMode.GENERATE_INPUT
