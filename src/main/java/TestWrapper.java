@@ -14,14 +14,17 @@ import org.junit.runners.model.InitializationError;
  */
 public class TestWrapper implements Runnable {
 
-    // These fields should be set via reflection, since Jacoco instantiates an instrumented Runnable
-    // that can't be cast to TestWrapper directly
-    public String genOutput = null;
-    public Class<?> testClass = null;
-    public String testMethod = null;
+    private final String genOutput;
+    private final Class<?> testClass;
+    private final String testMethod;
 
-    // This field should be read via reflection, for the same reason mentioned above (Jacoco jank)
-    public Result lastTestResult = null;
+    public TestWrapper(String genOutput, Class<?> testClass, String testMethod) {
+        this.genOutput = genOutput;
+        this.testClass = testClass;
+        this.testMethod = testMethod;
+    }
+
+    public Result lastTestResult = Result.INVALID;
 
     public void run() {
         // TODO generalize by saving current obj rather than serialized string
@@ -31,7 +34,7 @@ public class TestWrapper implements Runnable {
             // Handle exceptions (see FuzzStatement)
             // https://github.com/rohanpadhye/JQF/blob/master/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java
             Class<?>[] expectedExceptions = method.getMethod().getExceptionTypes();
-            Result result = null;
+            Result result;
             try {
                 testRunner.run();
                 result = Result.SUCCESS;
@@ -42,6 +45,7 @@ public class TestWrapper implements Runnable {
             } catch (GuidanceException e) {
                 throw e; // Propagate error so we can quit
             } catch (Throwable t) {
+                result = Result.FAILURE;
                 for (Class<?> e : expectedExceptions) {
                     if (e.isAssignableFrom(t.getClass())) {
                         result = Result.SUCCESS;

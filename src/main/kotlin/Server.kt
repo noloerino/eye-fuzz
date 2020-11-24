@@ -230,10 +230,7 @@ class Server<T>(private val gen: Generator<T>,
         val targetName = TestWrapper::class.java.name
         // TODO make class name array? configurable
         val compName = com.google.javascript.jscomp.Compiler::class.java.name
-        val testWrapper = TestWrapper()
-        testWrapper.genOutput = genGuidance.fuzzState.genOutput
-        testWrapper.testClass = testClass
-        testWrapper.testMethod = testMethod
+        val testWrapper = TestWrapper(genGuidance.fuzzState.genOutput, testClass, testMethod)
         testWrapper.run()
         lastTestResult = testWrapper.lastTestResult
         println("test result: $lastTestResult")
