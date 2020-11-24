@@ -10,18 +10,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jacoco.core.analysis.Analyzer
 import org.jacoco.core.analysis.CoverageBuilder
-import org.jacoco.core.analysis.ICounter
-import org.jacoco.core.data.ExecutionDataStore
-import org.jacoco.core.data.SessionInfoStore
-import org.jacoco.core.instr.Instrumenter
-import org.jacoco.core.runtime.LoggerRuntime
-import org.jacoco.core.runtime.RuntimeData
 import org.jacoco.core.tools.ExecFileLoader
-import org.jacoco.report.DirectorySourceFileLocator
-import org.jacoco.report.FileMultiReportOutput
-import org.jacoco.report.InputStreamSourceFileLocator
 import org.jacoco.report.csv.CSVFormatter
-import org.jacoco.report.html.HTMLFormatter
 import java.io.*
 import java.net.InetSocketAddress
 import java.util.*
@@ -213,7 +203,7 @@ class Server<T>(private val gen: Generator<T>,
     private fun init() {
         System.setProperty("jqf.traceGenerators", "true")
         this.runGenerator()
-//        this.runTestCase()
+        this.runTestCase()
     }
 
     /**
@@ -226,26 +216,7 @@ class Server<T>(private val gen: Generator<T>,
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
-    /**
-     * A class loader that loads classes from in-memory data.
-     * Copied from https://www.jacoco.org/jacoco/trunk/doc/examples/java/CoreTutorial.java
-     */
-    class MemoryClassLoader : ClassLoader() {
-        private val definitions: MutableMap<String, ByteArray> = HashMap()
-
-        fun addDefinition(name: String, bytes: ByteArray) {
-            definitions[name] = bytes
-        }
-
-        override fun loadClass(name: String, resolve: Boolean): Class<*> {
-            val bytes = definitions[name]
-            return if (bytes != null) {
-                defineClass(name, bytes, 0, bytes.size)
-            } else super.loadClass(name, resolve)
-        }
-    }
-
-    var testResultStream: ByteArrayOutputStream = ByteArrayOutputStream()
+    private var testResultStream: ByteArrayOutputStream = ByteArrayOutputStream()
 
     /**
      * Runs a test case and obtains coverage for it through Jacoco.
@@ -317,7 +288,7 @@ class Server<T>(private val gen: Generator<T>,
 //                println("Line $i: $statStr")
 //            }
 //        }
-//        println("Finished test case run")
+        println("Finished test case run")
     }
 
     private fun getGenContents(): String {

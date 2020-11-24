@@ -11,7 +11,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      * Since EIs are unique (as visiting the same location twice would result in an incremented count),
      * we're able to use a LinkedSet instead of an ordinary list.
      */
-    val usedThisRun = linkedSetOf<StackTrace>()
+    val usedThisRun = linkedSetOf<StackTraceInfo>()
     var choiceMap: ChoiceMap = linkedMapOf()
     val mapSize get() = choiceMap.size
 
@@ -56,7 +56,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      * Adds the EI to the map if not present, and returns the choice made at this EI.
      */
     fun add(stackTraceInfo: StackTraceInfo): Int {
-        usedThisRun.add(stackTraceInfo.stackTrace)
+        usedThisRun.add(stackTraceInfo)
         currRunResult.markUsed(stackTraceInfo)
         // Attempt to get a value from the map, or else generate a random value
         return choiceMap.computeIfAbsent(stackTraceInfo) {
@@ -78,7 +78,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
     }
     
     fun snapshot(): List<LocWithData> = choiceMap.map { (st, value) ->
-        LocWithData(st, value, st.stackTrace in usedThisRun)
+        LocWithData(st, value, st in usedThisRun)
     }
 }
 
@@ -128,7 +128,7 @@ class RunResult {
     }
 
     fun applyUpdate(state: FuzzState) {
-        markedUsed.forEach { state.usedThisRun.add(locList.elementAt(it).stackTrace) }
+        markedUsed.forEach { state.usedThisRun.add(locList.elementAt(it)) }
         createChoices.forEach { (i, choice) -> state.choiceMap[locList.elementAt(i)] = choice }
         updateChoices.forEach { (i, _, new) -> state.choiceMap[locList.elementAt(i)] = new }
     }
