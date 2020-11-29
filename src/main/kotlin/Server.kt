@@ -146,9 +146,6 @@ class Server<T>(private val gen: Generator<T>,
     private val rng = Random()
     internal val genGuidance = EiManualMutateGuidance(rng)
 
-    /** The result of the last test case run */
-    var testResult: org.junit.runner.Result? = null
-
     /**
      * A map of response handlers. Used to allow test cases to easily access the server without having to
      * actually perform HTTP requests.
@@ -205,8 +202,26 @@ class Server<T>(private val gen: Generator<T>,
                 LoadInputHandler(),
                 SaveSessionHandler(),
                 LoadSessionHandler(),
-                GenHandler(),
-                RunTestHandler()
+                object : ResponseHandler("generator") {
+                    override fun onGet(): String = getGenContents()
+
+                    override fun onPost(reader: BufferedReader): String {
+                        // Need to yield back to main thread, which is running a loop with a monitor
+                        // that just runs the generator when notified
+                        MainThreadTask.RERUN_GENERATOR.requestWork()
+                        return getGenContents()
+                    }
+                },
+                object : ResponseHandler("run_test") {
+                    override fun onGet(): String = Json.encodeToString(getTestCaseCov())
+
+                    override fun onPost(reader: BufferedReader): String {
+                        genGuidance.collectTestCov().use {
+                            MainThreadTask.RUN_TEST_CASE.requestWork()
+                        }
+                        return Json.encodeToString(getTestCaseCov())
+                    }
+                }
         )
         responseHandlers.values.forEach { server.createContext("/${it.name}", it) }
         server.start()
@@ -233,6 +248,8 @@ class Server<T>(private val gen: Generator<T>,
     }
 
     private var testResultStream: ByteArrayOutputStream = ByteArrayOutputStream()
+
+    private var lastTestResult: Result = Result.INVALID
 
     /**
      * Runs a test case and obtains coverage for it through Jacoco.
@@ -324,37 +341,6 @@ class Server<T>(private val gen: Generator<T>,
         genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
         println(genGuidance.history.runResults.map { it.serializedResult })
         println("generator produced: " + getGenContents())
-    }
-
-    private var lastTestResult: Result = Result.SUCCESS
-
-    // ===================== TEST CASE API STUFF =====================
-    private inner class RunTestHandler : ResponseHandler("run_test") {
-        override fun onGet(): String {
-            return Json.encodeToString(getTestCaseCov())
-        }
-
-        override fun onPost(reader: BufferedReader): String {
-            genGuidance.collectTestCov().use {
-                MainThreadTask.RUN_TEST_CASE.requestWork()
-            }
-            return Json.encodeToString(getTestCaseCov())
-        }
-    }
-
-    // ===================== GENERATOR API STUFF =====================
-
-    private inner class GenHandler : ResponseHandler("generator") {
-        override fun onGet(): String {
-            return getGenContents()
-        }
-
-        override fun onPost(reader: BufferedReader): String {
-            // Need to yield back to main thread, which is running a loop with a monitor
-            // that just runs the generator when notified
-            MainThreadTask.RERUN_GENERATOR.requestWork()
-            return getGenContents()
-        }
     }
 
     private val saveInputDir = File("savedInputs")
