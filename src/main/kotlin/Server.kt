@@ -149,50 +149,66 @@ class Server<T>(private val gen: Generator<T>,
     /** The result of the last test case run */
     var testResult: org.junit.runner.Result? = null
 
+    /**
+     * A map of response handlers. Used to allow test cases to easily access the server without having to
+     * actually perform HTTP requests.
+     * These must all be initialized before start() is called.
+     */
+    val responseHandlers: Map<String, ResponseHandler> get() = _responseHandlers
+    // Backing field needed to hide mutability from API
+    private val _responseHandlers: MutableMap<String, ResponseHandler> = mutableMapOf()
+
+    private fun addHandlers(vararg handlers: ResponseHandler) {
+        handlers.forEach { _responseHandlers[it.name] = it }
+    }
+
     fun start() {
         init()
         val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
-        server.createContext("/ei", object : ResponseHandler("ei") {
-            /**
-             * GET returns a list of all EIs in the map.
-             */
-            override fun onGet(): String {
-                val data = genGuidance.fuzzState.snapshot()
-                return Json.encodeToString(data)
-            }
+        addHandlers(
+                object : ResponseHandler("ei") {
+                    /**
+                     * GET returns a list of all EIs in the map.
+                     */
+                    override fun onGet(): String {
+                        val data = genGuidance.fuzzState.snapshot()
+                        return Json.encodeToString(data)
+                    }
 
-            /**
-             * PATCH performs a partial update to EIs, leaving ones that weren't included in the request untouched.
-             */
-            override fun onPatch(reader: BufferedReader): String {
-                val text = reader.readText()
-                val arr = Json.decodeFromString<List<LocFromPatch>>(text)
-                for (e in arr) {
-                    genGuidance.fuzzState.update(e.index, e.choice)
-                }
-                return "OK"
-            }
-        })
-        server.createContext("/reset", object : ResponseHandler("reset") {
-            /**
-             * Nukes the fuzzing session and starts afresh.
-             */
-            override fun onPost(reader: BufferedReader): String {
-                println("Clearing EI map and restarting...")
-                genGuidance.fuzzState.clear()
-                MainThreadTask.RERUN_GENERATOR.requestWork()
-                return "OK"
-            }
-        })
-        server.createContext("/history", object : ResponseHandler("history") {
-            override fun onGet(): String = Json.encodeToString(genGuidance.fuzzState.history)
-        })
-        server.createContext("/save_input", SaveInputHandler())
-        server.createContext("/load_input", LoadInputHandler())
-        server.createContext("/save_session", SaveSessionHandler())
-        server.createContext("/load_session", LoadSessionHandler())
-        server.createContext("/generator", GenHandler())
-        server.createContext("/run_test", RunTestHandler())
+                    /**
+                     * PATCH performs a partial update to EIs, leaving ones that weren't included in the request untouched.
+                     */
+                    override fun onPatch(reader: BufferedReader): String {
+                        val text = reader.readText()
+                        val arr = Json.decodeFromString<List<LocFromPatch>>(text)
+                        for (e in arr) {
+                            genGuidance.fuzzState.update(e.index, e.choice)
+                        }
+                        return "OK"
+                    }
+                },
+                object : ResponseHandler("reset") {
+                    /**
+                     * Nukes the fuzzing session and starts afresh.
+                     */
+                    override fun onPost(reader: BufferedReader): String {
+                        println("Clearing EI map and restarting...")
+                        genGuidance.fuzzState.clear()
+                        MainThreadTask.RERUN_GENERATOR.requestWork()
+                        return "OK"
+                    }
+                },
+                object : ResponseHandler("history") {
+                    override fun onGet(): String = Json.encodeToString(genGuidance.fuzzState.history)
+                },
+                SaveInputHandler(),
+                LoadInputHandler(),
+                SaveSessionHandler(),
+                LoadSessionHandler(),
+                GenHandler(),
+                RunTestHandler()
+        )
+        responseHandlers.values.forEach { server.createContext("/${it.name}", it) }
         server.start()
         println("Server initialized at port " + server.address.port)
         while (true) {

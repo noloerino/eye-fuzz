@@ -4,7 +4,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import kotlin.system.exitProcess
 
-abstract class ResponseHandler(private val name: String?) : HttpHandler {
+abstract class ResponseHandler(val name: String) : HttpHandler {
 
     private val verbose = true //false
 
