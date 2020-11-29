@@ -2,9 +2,16 @@
             
 # Runs the server. Assumes "mvn package" has been run to build the jar.
 JAR_PATH='target/eye-fuzz-1.0-SNAPSHOT-jar-with-dependencies.jar'
-if [ ! -e "$JAR_PATH" ]; then
+if [ ! -f "$JAR_PATH" ]; then
     echo "Server jar (at $JAR_PATH) has not been built"
     echo "Please run 'mvn package' first."
+    exit 1
+fi
+
+JS_PATH='client/bin/app.js'
+if [ ! -f "$JS_PATH" ]; then
+    echo "Frontend has not been built."
+    echo "Please run 'cd client && yarn build' first."
     exit 1
 fi
 

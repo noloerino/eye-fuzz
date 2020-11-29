@@ -7,8 +7,27 @@ Java HTTP server, and POSTs/GETs updates to those bytes and the resulting progra
 
 `mvn package` builds a fat JAR to run the server. `yarn start` from the `client` directory builds the frontend.
 
-### Running the thing
-- Run the shell script (will update with more later probably)
-- Open `index.html` in a browser. The "Rerun Generator" button will perform a POST request with the data in the
-  input fields as payload. Changes to the EI map should appear automatically in the frontend (you may need to scroll
-  down a bit).
+## Build and Run
+First, write your generator and test driver in a separate directory (see the
+[Zest wiki](https://github.com/rohanpadhye/JQF/wiki/Fuzzing-with-Zest)) for an example of how to do this.
+
+Run the following two commands to build the backend and frontend for this server:
+```
+mvn package                 # Build the server backend
+cd client && yarn build     # Build the frontend
+```
+
+Next, start up the server with the following commands:
+```
+./server.sh [-c <classpath>] <args> 
+```
+where `<classpath>` is the build directory containing your JAR or class files of the test driver and generator.
+`<args>` are as follows, in order:
+- `GENERATOR_CLASS_NAME`: the name of the generator class
+- `TEST_CLASS_NAME`: the name of the test driver class
+- `TEST_METHOD_NAME`: the name of the method on the test driver to be invoked
+- \[optional\] `SERIALIZER_CLASS`: a class containing a method to serialize the generator output
+- \[optional\] `SERIALIZER_FUNC`: a method to transform the generator output into a human-readable string
+
+Lastly, open `client/index.html` to begin fuzzing.
+
