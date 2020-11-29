@@ -13,6 +13,7 @@ import org.jacoco.core.analysis.CoverageBuilder
 import org.jacoco.core.tools.ExecFileLoader
 import org.jacoco.report.csv.CSVFormatter
 import java.io.*
+import java.lang.reflect.ParameterizedType
 import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
@@ -133,18 +134,33 @@ private enum class MainThreadTask {
 class Server<T>(private val gen: Generator<T>,
                 testClassName: String,
                 private val testMethod: String,
-                private val genOutputSerializer: (T) -> String) {
+                private val genOutputSerializer: (T?) -> String) {
     // WARNING: REMOVING THIS CONSTRUCTOR AND PASSING toString AS A DEFAULT ARGUMENT WILL BREAK EI TRACKING
     // FOR SOME DUMB REASON
     constructor(gen: Generator<T>, testClassName: String, testMethod: String)
         : this(gen, testClassName, testMethod, { v -> v.toString() })
 
+    /**
+     * Determines whether the server is being run in unit test mode.
+     * In unit test mode, the behavior of response handlers is exposed, but the actual HTTP server isn't activated.
+     * This should be set programmatically before the start() method is called.
+     */
+    var underUnitTest = false;
+
     private val testClass = Class.forName(testClassName)
     val mainThread: Thread = Thread.currentThread()
 
+    // Need to compute type that generator produces at runtime
+    @Suppress("UNCHECKED_CAST")
+    private val genOutputClass: Class<T> =
+            (Class.forName(gen.javaClass.name).genericSuperclass as ParameterizedType)
+                    .actualTypeArguments[0] as Class<T>
+
     /** Tracks the random value stored at a choice, as well as the last line of the stack trace  */
     private val rng = Random()
-    internal val genGuidance = EiManualMutateGuidance(rng)
+    internal val genGuidance = EiManualMutateGuidance<T>(rng)
+
+    private val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
 
     /**
      * A map of response handlers. Used to allow test cases to easily access the server without having to
@@ -156,12 +172,13 @@ class Server<T>(private val gen: Generator<T>,
     private val _responseHandlers: MutableMap<String, ResponseHandler> = mutableMapOf()
 
     private fun addHandlers(vararg handlers: ResponseHandler) {
-        handlers.forEach { _responseHandlers[it.name] = it }
+        handlers.forEach {
+            _responseHandlers[it.name] = it
+            server.createContext("/${it.name}", it)
+        }
     }
 
-    fun start() {
-        init()
-        val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
+    init {
         addHandlers(
                 object : ResponseHandler("ei") {
                     /**
@@ -202,6 +219,7 @@ class Server<T>(private val gen: Generator<T>,
                 LoadInputHandler(),
                 SaveSessionHandler(),
                 LoadSessionHandler(),
+                // Runs the generator and/or gets the generator result
                 object : ResponseHandler("generator") {
                     override fun onGet(): String = getGenContents()
 
@@ -212,6 +230,7 @@ class Server<T>(private val gen: Generator<T>,
                         return getGenContents()
                     }
                 },
+                // Runs a test case, or gets test coverage
                 object : ResponseHandler("run_test") {
                     override fun onGet(): String = Json.encodeToString(getTestCaseCov())
 
@@ -221,18 +240,22 @@ class Server<T>(private val gen: Generator<T>,
                         }
                         return Json.encodeToString(getTestCaseCov())
                     }
-                }
+                },
         )
-        responseHandlers.values.forEach { server.createContext("/${it.name}", it) }
-        server.start()
-        println("Server initialized at port " + server.address.port)
+    }
+
+    fun start() {
+        init()
+        if (!underUnitTest) {
+            server.start()
+            println("Server initialized at port " + server.address.port)
+        }
         while (true) {
             MainThreadTask.waitForJob(this)
         }
     }
 
     private fun init() {
-        System.setProperty("jqf.traceGenerators", "true")
         this.runGenerator()
         this.runTestCase()
     }
@@ -263,7 +286,7 @@ class Server<T>(private val gen: Generator<T>,
         val targetName = TestWrapper::class.java.name
         // TODO make class name array? configurable
         val compName = com.google.javascript.jscomp.Compiler::class.java.name
-        val testWrapper = TestWrapper(genGuidance.fuzzState.genOutput, testClass, testMethod)
+        val testWrapper = TestWrapper(genGuidance.fuzzState.genOutput, testClass, testMethod, genOutputClass)
         testWrapper.run()
         lastTestResult = testWrapper.lastTestResult
         println("test result: $lastTestResult")
@@ -323,7 +346,8 @@ class Server<T>(private val gen: Generator<T>,
 
     private fun getGenContents(): String {
         val genContents = genGuidance.fuzzState.genOutput
-        return genContents.substring(0, genContents.length.coerceAtMost(1024))
+        val serialized = genOutputSerializer(genContents)
+        return serialized.substring(0, serialized.length.coerceAtMost(1024))
     }
 
     private fun getTestCaseCov(): TestCovResult {
@@ -338,14 +362,17 @@ class Server<T>(private val gen: Generator<T>,
         val random = AnnotatingRandomSource(randomFile)
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
         genGuidance.annotatingRandomSource = random
-        genGuidance.fuzzState.genOutput = genOutputSerializer(gen.generate(random, genStatus))
-        println(genGuidance.history.runResults.map { it.serializedResult })
+        genGuidance.fuzzState.genOutput = gen.generate(random, genStatus)
+        // TODO compute these only once
+        println(genGuidance.history.runResults.map { genOutputSerializer(it.result) })
         println("generator produced: " + getGenContents())
     }
 
     private val saveInputDir = File("savedInputs")
     init {
-        assert(saveInputDir.mkdirs()) { "Unable to create saved input directory at $saveInputDir" }
+        assert(saveInputDir.isDirectory || saveInputDir.mkdirs()) {
+            "Unable to create saved input directory at ${saveInputDir.canonicalPath}"
+        }
     }
 
     private fun resolveInputFile(fileName: String): File = saveInputDir.toPath().resolve(fileName).toFile()
@@ -390,7 +417,9 @@ class Server<T>(private val gen: Generator<T>,
 
     private val saveSessionDir = File("savedSessions")
     init {
-        assert(saveSessionDir.mkdirs()) { "Unable to create saved session directory at $saveSessionDir" }
+        assert(saveSessionDir.isDirectory || saveSessionDir.mkdirs()) {
+            "Unable to create saved session directory at ${saveSessionDir.canonicalPath}"
+        }
     }
 
     private fun resolveSessionFile(fileName: String): File = saveSessionDir.toPath().resolve(fileName).toFile()

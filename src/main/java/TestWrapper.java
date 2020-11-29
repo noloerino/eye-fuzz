@@ -12,16 +12,18 @@ import org.junit.runners.model.InitializationError;
  *
  * It also needs to be in Java for API compatibility reasons.
  */
-public class TestWrapper implements Runnable {
+public class TestWrapper<T> implements Runnable {
 
-    private final String genOutput;
+    private final T genOutput;
     private final Class<?> testClass;
     private final String testMethod;
+    private final Class<T> genOutClass;
 
-    public TestWrapper(String genOutput, Class<?> testClass, String testMethod) {
+    public TestWrapper(T genOutput, Class<?> testClass, String testMethod, Class<T> genOutClass) {
         this.genOutput = genOutput;
         this.testClass = testClass;
         this.testMethod = testMethod;
+        this.genOutClass = genOutClass;
     }
 
     public Result lastTestResult = Result.INVALID;
@@ -29,8 +31,8 @@ public class TestWrapper implements Runnable {
     public void run() {
         // TODO generalize by saving current obj rather than serialized string
         try {
-            FrameworkMethod method = new FrameworkMethod(testClass.getMethod(testMethod, String.class));
-            TrialRunner testRunner = new TrialRunner(testClass, method, new String[] { genOutput });
+            FrameworkMethod method = new FrameworkMethod(testClass.getMethod(testMethod, genOutClass));
+            TrialRunner testRunner = new TrialRunner(testClass, method, new Object[] { genOutput });
             // Handle exceptions (see FuzzStatement)
             // https://github.com/rohanpadhye/JQF/blob/master/fuzz/src/main/java/edu/berkeley/cs/jqf/fuzz/junit/quickcheck/FuzzStatement.java
             Class<?>[] expectedExceptions = method.getMethod().getExceptionTypes();

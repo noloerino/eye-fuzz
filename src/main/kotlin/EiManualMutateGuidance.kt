@@ -26,15 +26,15 @@ enum class GuidanceMode {
  * This class also doubles as a repro guidance and also a collector of test coverage, because there's some funky
  * thread stuff going on.
  */
-class EiManualMutateGuidance(rng: Random) : Guidance {
+class EiManualMutateGuidance<T>(rng: Random) : Guidance {
     var annotatingRandomSource: AnnotatingRandomSource? = null
 
     private var mode = GuidanceMode.GENERATE_INPUT
 
     private var hasRun = false
 
-    val fuzzState = FuzzState(this, rng)
-    val history: FuzzHistory by fuzzState::history
+    val fuzzState = FuzzState<T>(this, rng)
+    val history: FuzzHistory<T> by fuzzState::history
 
     /**
      * During a repro run, the original choice map is saved here. Any values that did not appear in the choice run
@@ -146,7 +146,7 @@ class EiManualMutateGuidance(rng: Random) : Guidance {
     }
 
     fun loadSessionHistory(src: File) {
-        val newHistory: FuzzHistory = Json.decodeFromString(src.readText())
+        val newHistory: FuzzHistory<T> = Json.decodeFromString(src.readText())
         fuzzState.reloadFromHistory(newHistory)
     }
 

@@ -7,12 +7,15 @@ import kotlin.random.asJavaRandom
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests that sessions can be serialized and deserialized properly.
+ */
 class SessionSerializationTest {
     private val rng = Random(0)
 
     @Test
     fun testEncodeDecode() {
-        val state = EiManualMutateGuidance(rng.asJavaRandom()).fuzzState
+        val state = EiManualMutateGuidance<String>(rng.asJavaRandom()).fuzzState
         // Mock 3-6 iterations of fuzzing
         val eis = mutableSetOf<StackTraceInfo>()
         (0..(max(3 + rng.nextInt(3), eis.size))).forEach { _ ->
@@ -30,7 +33,7 @@ class SessionSerializationTest {
         }
         // Make clones of the list in case some funky mutation occurs
         val originalHistory = state.history.copy(locList.toList(), state.history.runResults)
-        val decodedHistory: FuzzHistory = Json.decodeFromString(Json.encodeToString(originalHistory))
+        val decodedHistory: FuzzHistory<String> = Json.decodeFromString(Json.encodeToString(originalHistory))
         assertEquals(originalHistory, decodedHistory)
     }
 

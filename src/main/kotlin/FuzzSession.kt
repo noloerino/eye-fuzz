@@ -2,9 +2,9 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 @Serializable
-data class FuzzHistory(val locList: List<StackTraceInfo>, val runResults: List<RunResult>)
+data class FuzzHistory<T>(val locList: List<StackTraceInfo>, val runResults: List<RunResult<T>>)
 
-class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: Random) {
+class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val rng: Random) {
     /**
      * Tracks which EIs were used in the most recent run of the generator.
      *
@@ -21,13 +21,13 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
      *
      * The initial element is an empty result.
      */
-    private val diffStack = mutableListOf(RunResult())
-    private val currRunResult: RunResult get() = diffStack.last()
-    var genOutput get() = currRunResult.serializedResult
-        set(v) { currRunResult.serializedResult = v }
+    private val diffStack = mutableListOf(RunResult<T>())
+    private val currRunResult: RunResult<T> get() = diffStack.last()
+    var genOutput get() = currRunResult.result
+        set(v) { currRunResult.result = v }
 
     // hides mutability of diffs, and remove first sentinel node
-    val history: FuzzHistory get() {
+    val history: FuzzHistory<T> get() {
         return FuzzHistory(locList.toList(), diffStack)
     }
 
@@ -43,7 +43,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
         locList.clear()
     }
 
-    fun reloadFromHistory(newHistory: FuzzHistory) {
+    fun reloadFromHistory(newHistory: FuzzHistory<T>) {
         clear()
         locList.addAll(newHistory.locList)
         newHistory.runResults.forEach { runResult ->
@@ -90,7 +90,7 @@ class FuzzState(private val guidance: EiManualMutateGuidance, private val rng: R
  * followed by updates to existing EI.
  */
 @Serializable
-class RunResult {
+class RunResult<T> {
     /**
      * Looks up the int associated with a particular stack trace, assigning a new one if necessary.
      */
@@ -110,7 +110,7 @@ class RunResult {
     @Serializable
     data class CreateChoice(val locIndex: LocIndex, val new: Int)
 
-    var serializedResult: String = ""
+    var result: T? = null
     private val markedUsed = mutableSetOf<LocIndex>()
     private val createChoices = mutableListOf<CreateChoice>()
     private val updateChoices = mutableListOf<UpdateChoice>()
@@ -127,21 +127,21 @@ class RunResult {
         createChoices.add(CreateChoice(lookupOrStore(stackTraceInfo), choice))
     }
 
-    fun applyUpdate(state: FuzzState) {
+    fun applyUpdate(state: FuzzState<T>) {
         markedUsed.forEach { state.usedThisRun.add(locList.elementAt(it)) }
         createChoices.forEach { (i, choice) -> state.choiceMap[locList.elementAt(i)] = choice }
         updateChoices.forEach { (i, _, new) -> state.choiceMap[locList.elementAt(i)] = new }
     }
 
-    fun copy(): RunResult {
-        val other = RunResult()
+    fun copy(): RunResult<T> {
+        val other = RunResult<T>()
         other.markedUsed.addAll(markedUsed)
         Collections.addAll(other.updateChoices, *updateChoices.toTypedArray())
         Collections.addAll(other.createChoices, *createChoices.toTypedArray())
         return other
     }
 
-    override fun equals(other: Any?): Boolean = other is RunResult
+    override fun equals(other: Any?): Boolean = other is RunResult<*>
             && markedUsed == other.markedUsed
             && updateChoices == other.updateChoices
             && createChoices == other.createChoices
