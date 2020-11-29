@@ -16,6 +16,7 @@ Run the following two commands to build the backend and frontend for this server
 mvn package                 # Build the server backend
 cd client && yarn build     # Build the frontend
 ```
+TODO package produces jar, but what produces class files?
 
 Next, start up the server with the following commands:
 ```

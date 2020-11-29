@@ -13,7 +13,11 @@ fun main(args: Array<String>) {
 //        val genType = (Class.forName(args[0]).genericSuperclass as ParameterizedType).actualTypeArguments[0].javaClass
 //        serialFunc = serialClass.javaClass.getMethod(args[5], genType)
     }
-    val genClass = Class.forName(args[0])
+//    println("cp: ${System.getProperty("java.class.path")}")
+    val loader = ClassLoader.getSystemClassLoader()
+//    println("loader: ${loader.getResource("CalendarTest")}")
+//    println("loader self: ${loader.getResource("MainKt")}")
+    val genClass = Class.forName(args[0], true, loader)
     val genInstance = genClass.newInstance() as Generator<*>
     val server = Server(genInstance, args[1], args[2])
 //             Server(XmlDocumentGenerator(), XMLDocumentUtils::documentToString)
