@@ -145,7 +145,7 @@ class Server<T>(private val gen: Generator<T>,
      * In unit test mode, the behavior of response handlers is exposed, but the actual HTTP server isn't activated.
      * This should be set programmatically before the start() method is called.
      */
-    var underUnitTest = false;
+    var underUnitTest = false
 
     private val testClass = Class.forName(testClassName)
     val mainThread: Thread = Thread.currentThread()

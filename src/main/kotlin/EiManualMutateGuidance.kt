@@ -33,7 +33,7 @@ class EiManualMutateGuidance<T>(rng: Random) : Guidance {
 
     private var hasRun = false
 
-    val fuzzState = FuzzState<T>(this, rng)
+    val fuzzState = FuzzState(this, rng)
     val history: FuzzHistory<T> by fuzzState::history
 
     /**
