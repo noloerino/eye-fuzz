@@ -158,7 +158,7 @@ class Server<T>(private val gen: Generator<T>,
 
     /** Tracks the random value stored at a choice, as well as the last line of the stack trace  */
     private val rng = Random()
-    internal val genGuidance = EiManualMutateGuidance<T>(rng)
+    internal val genGuidance = EiManualMutateGuidance<T>(rng, genOutputSerializer)
 
     private val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
 
@@ -364,7 +364,7 @@ class Server<T>(private val gen: Generator<T>,
         genGuidance.annotatingRandomSource = random
         genGuidance.fuzzState.genOutput = gen.generate(random, genStatus)
         // TODO compute these only once
-        println(genGuidance.history.runResults.map { genOutputSerializer(it.result) })
+        println(genGuidance.history.runResults.map { it.serializedResult })
         println("generator produced: " + getGenContents())
     }
 

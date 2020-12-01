@@ -145,7 +145,7 @@ export type CreateChoice = {
 export type FuzzHistory = {
     locList: StackTraceInfo[];
     runResults: {
-        serializedResult: string;
+        serializedResult: string | null;
         markedUsed: LocIndex[],
         updateChoices: UpdateChoice[],
         createChoices: CreateChoice[],

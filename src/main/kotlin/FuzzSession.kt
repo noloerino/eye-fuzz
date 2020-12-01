@@ -2,7 +2,7 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 @Serializable
-data class FuzzHistory<T>(val locList: List<StackTraceInfo>, val runResults: List<RunResult<T>>)
+data class FuzzHistory(val locList: List<StackTraceInfo>, val runResults: List<RunResult>)
 
 class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val rng: Random) {
     /**
@@ -21,13 +21,16 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
      *
      * The initial element is an empty result.
      */
-    private val diffStack = mutableListOf(RunResult<T>())
-    private val currRunResult: RunResult<T> get() = diffStack.last()
-    var genOutput get() = currRunResult.result
-        set(v) { currRunResult.result = v }
+    private val diffStack = mutableListOf(RunResult())
+    private val currRunResult: RunResult get() = diffStack.last()
+    var genOutput: T? = null
+        set(value) {
+            field = value
+            currRunResult.serializedResult = guidance.genOutputSerializer(value)
+        }
 
     // hides mutability of diffs, and remove first sentinel node
-    val history: FuzzHistory<T> get() {
+    val history: FuzzHistory get() {
         return FuzzHistory(locList.toList(), diffStack)
     }
 
@@ -43,7 +46,7 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
         locList.clear()
     }
 
-    fun reloadFromHistory(newHistory: FuzzHistory<T>) {
+    fun reloadFromHistory(newHistory: FuzzHistory) {
         clear()
         locList.addAll(newHistory.locList)
         newHistory.runResults.forEach { runResult ->
@@ -86,11 +89,14 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
  * Encodes information about changes produced over the course of a run.
  * A new instance is blank, and should be mutated over the course of a single generator run.
  *
- * The updates are applied in the orders listed in the fields: used EI are marked first, followed by creation of new EI
- * followed by updates to existing EI.
+ * The updates are applied in the orders listed in the fields: used locations are marked first, followed by creation of
+ * new locations, followed by updates to existing locations.
+ *
+ * Kotlin serialization is a little funky and doesn't like when a type is parameterized on T, so to circumvent this
+ * we store only the serialized version of the generator output.
  */
 @Serializable
-class RunResult<T> {
+class RunResult {
     /**
      * Looks up the int associated with a particular stack trace, assigning a new one if necessary.
      */
@@ -110,7 +116,7 @@ class RunResult<T> {
     @Serializable
     data class CreateChoice(val locIndex: LocIndex, val new: Int)
 
-    var result: T? = null
+    var serializedResult: String? = null
     private val markedUsed = mutableSetOf<LocIndex>()
     private val createChoices = mutableListOf<CreateChoice>()
     private val updateChoices = mutableListOf<UpdateChoice>()
@@ -127,21 +133,21 @@ class RunResult<T> {
         createChoices.add(CreateChoice(lookupOrStore(stackTraceInfo), choice))
     }
 
-    fun applyUpdate(state: FuzzState<T>) {
+    fun <T> applyUpdate(state: FuzzState<T>) {
         markedUsed.forEach { state.usedThisRun.add(locList.elementAt(it)) }
         createChoices.forEach { (i, choice) -> state.choiceMap[locList.elementAt(i)] = choice }
         updateChoices.forEach { (i, _, new) -> state.choiceMap[locList.elementAt(i)] = new }
     }
 
-    fun copy(): RunResult<T> {
-        val other = RunResult<T>()
+    fun copy(): RunResult {
+        val other = RunResult()
         other.markedUsed.addAll(markedUsed)
         Collections.addAll(other.updateChoices, *updateChoices.toTypedArray())
         Collections.addAll(other.createChoices, *createChoices.toTypedArray())
         return other
     }
 
-    override fun equals(other: Any?): Boolean = other is RunResult<*>
+    override fun equals(other: Any?): Boolean = other is RunResult
             && markedUsed == other.markedUsed
             && updateChoices == other.updateChoices
             && createChoices == other.createChoices
