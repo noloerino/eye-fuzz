@@ -57,7 +57,7 @@ public class JavaScriptCodeGenerator extends Generator<String> {
     private static final int MAX_IDENTIFIERS = 10;
     private static final int MAX_EXPRESSION_DEPTH = 1;
     private static final int MAX_STATEMENT_DEPTH = 1;
-    private static Set<String> identifiers;
+    private Set<String> identifiers;
     private int statementDepth;
     private int expressionDepth;
 
@@ -80,7 +80,7 @@ public class JavaScriptCodeGenerator extends Generator<String> {
         this.identifiers = new HashSet<>();
         this.statementDepth = 0;
         this.expressionDepth = 0;
-        return generateStatement(random).toString();
+        return generateStatement(random);
     }
 
     private static int sampleGeometric(SourceOfRandomness random, double mean) {

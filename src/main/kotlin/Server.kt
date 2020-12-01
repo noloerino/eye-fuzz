@@ -112,7 +112,9 @@ private enum class MainThreadTask {
          * @return the requested task item
          */
         fun waitForJob(server: Server<*>) {
-            require(Thread.currentThread() == server.mainThread) { "Jobs must run on the main thread" }
+            require(server.underUnitTest || Thread.currentThread() == server.mainThread) {
+                "Jobs must run on the main thread"
+            }
             lock.lock()
             try {
                 while (taskQ.isEmpty()) {
@@ -257,15 +259,20 @@ class Server<T>(private val gen: Generator<T>,
             server.start()
             println("Server initialized at port " + server.address.port)
         }
-        while (isRunning) {
-            MainThreadTask.waitForJob(this)
+        try {
+            while (isRunning) {
+                MainThreadTask.waitForJob(this)
+            }
+        } finally {
+            println("Server exiting")
+            server.stop(1)
         }
-        server.stop(10);
     }
 
     private fun init() {
         this.runGenerator()
         this.runTestCase()
+        isRunning = true
     }
 
     fun stop() {
@@ -380,7 +387,7 @@ class Server<T>(private val gen: Generator<T>,
         println("generator produced: " + getGenContents())
     }
 
-    private val saveInputDir = File("savedInputs")
+    val saveInputDir = File("savedInputs")
     init {
         assert(saveInputDir.isDirectory || saveInputDir.mkdirs()) {
             "Unable to create saved input directory at ${saveInputDir.canonicalPath}"
@@ -390,7 +397,7 @@ class Server<T>(private val gen: Generator<T>,
     private fun resolveInputFile(fileName: String): File = saveInputDir.toPath().resolve(fileName).toFile()
 
     @Serializable
-    private data class SaveLoadRequest(val fileName: String)
+    data class SaveLoadRequest(val fileName: String)
 
     private inner class SaveInputHandler : ResponseHandler("save_input") {
         override fun onPost(reader: BufferedReader): String {
@@ -427,7 +434,7 @@ class Server<T>(private val gen: Generator<T>,
         }
     }
 
-    private val saveSessionDir = File("savedSessions")
+    val saveSessionDir = File("savedSessions")
     init {
         assert(saveSessionDir.isDirectory || saveSessionDir.mkdirs()) {
             "Unable to create saved session directory at ${saveSessionDir.canonicalPath}"
