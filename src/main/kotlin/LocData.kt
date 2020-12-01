@@ -40,8 +40,19 @@ fun StackTraceElement.toLine(): StackTraceLine = StackTraceLine(
         this.className,
         this.fileName,
         this.lineNumber,
-        this.methodName
+        this.methodName,
+        0 // TODO
 )
 
+/**
+ * A "stack trace with counts," very much like Zest's ExecutionIndex. Unlike ExecutionIndex, a new stack trace is
+ * recorded only when an invocation to random() occurs, not on every byte produced by the randomness source.
+ */
 @Serializable
-data class StackTraceLine(val className: String, val fileName: String?, val lineNumber: Int, val methodName: String)
+data class StackTraceLine(
+        val className: String,
+        val fileName: String?,
+        val lineNumber: Int,
+        val methodName: String,
+        val count: Int
+)

@@ -51,11 +51,50 @@ private fun getCurrentStackTrace(): StackTrace {
     return full.subList(randIdx, stubIdx)
 }
 
-// still need to implement: nextBigInteger, nextInstant, nextDuration
+/**
+ * Intercepts calls to FastSourceOfRandomness and annotates it with relevant type information and stack traces.
+ * A new instance of this class is created on each generator run.
+ *
+ * Unsupported methods: nextBigInteger, nextInstant, nextDuration
+ */
 class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomness(delegate) {
     // Keep track of which function actually was the top level
     var depth = 0
     private var choiceState: RandomChoiceState? = null
+
+    // TODO do some kind of caching for stack traces to ensure that when a new one is encountered, the relevant
+    // count is incremented
+    //
+    // Consider the case where we have two identical stack traces (A, B, C), where A, B, and C are all functions that
+    // have only a single line.
+    // There are at least two distinct ways this could have occurred, both of which may plausibly be possible in the
+    // same program due to boolean short-circuiting or even just pathological use of semicolons:
+    //
+    //   fun A() {
+    //       check ? (B() && B()) : B();
+    //   }
+    //   fun B() {
+    //       !check ? (C() && C()) : C();
+    //       return true;
+    //   }
+    //   fun C() {
+    //       random();
+    //       return true;
+    //   }
+    //
+    // - Function B is called twice in one occurrence at A; B performs an invocation to C each time (check is true)
+    // - Function C is called twice at B; B is called once at A; B calls C twice (check is false)
+    //
+    // Unlike Zest, we cannot meaningfully distinguish between these two cases because random() has no additional
+    // knowledge about where B()/C() was invoked besides line number. The only thing we can count is how many times
+    // C() was called after being called by A and B at that particular location.
+    // In a single run, this is actually sufficient for our purposes: all we need is a way to distinguish between each
+    // time we see the (A, B, C) stack trace triple; since each occurrence of the stack trace corresponds to a different
+    // choice, we can assign them different IDs and call it a day. However, this won't work if branching logic changes;
+    // i.e. if the `check` variable were to change, then we'd need to produce a new set of random bytes for the new
+    // invocation of random(). It is not enough to say "the third occurrence of (A, B, C) should correspond to this
+    // byte" because the third occurrence might be a different random() invocation on every run. This would become
+    // especially apparent in repro bugs.
 
     /**
      * Returns an object representing type information for the last retrieved byte.
