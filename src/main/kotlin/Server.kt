@@ -46,6 +46,12 @@ private enum class MainThreadTask {
         override fun job(server: Server<*>) {
             server.runTestCase()
         }
+    },
+
+    TURN_OFF {
+        override fun job(server: Server<*>) {
+            server.isRunning = false
+        }
     }
     ;
 
@@ -134,11 +140,10 @@ private enum class MainThreadTask {
 class Server<T>(private val gen: Generator<T>,
                 testClassName: String,
                 private val testMethod: String,
-                private val genOutputSerializer: (T?) -> String) {
-    // WARNING: REMOVING THIS CONSTRUCTOR AND PASSING toString AS A DEFAULT ARGUMENT WILL BREAK EI TRACKING
-    // FOR SOME DUMB REASON
-    constructor(gen: Generator<T>, testClassName: String, testMethod: String)
-        : this(gen, testClassName, testMethod, { v -> v.toString() })
+                private val genOutputSerializer: (T?) -> String = { v -> v.toString() }) {
+    // WARNING: IF EVER THE SERVER GOES BACK TO USING ZEST ExecutionIndex,
+    // PASSING toString AS A DEFAULT ARGUMENT WILL BREAK EI TRACKING FOR SOME DUMB REASON
+    // FIX: CREATE A SECOND CONSTRUCTOR THAT PASSES A DEFAULT toString
 
     /**
      * Determines whether the server is being run in unit test mode.
@@ -146,6 +151,8 @@ class Server<T>(private val gen: Generator<T>,
      * This should be set programmatically before the start() method is called.
      */
     var underUnitTest = false
+
+    var isRunning = false
 
     private val testClass = Class.forName(testClassName)
     val mainThread: Thread = Thread.currentThread()
@@ -250,14 +257,19 @@ class Server<T>(private val gen: Generator<T>,
             server.start()
             println("Server initialized at port " + server.address.port)
         }
-        while (true) {
+        while (isRunning) {
             MainThreadTask.waitForJob(this)
         }
+        server.stop(10);
     }
 
     private fun init() {
         this.runGenerator()
         this.runTestCase()
+    }
+
+    fun stop() {
+        MainThreadTask.TURN_OFF.requestWork()
     }
 
     /**

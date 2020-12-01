@@ -25,18 +25,13 @@ class SameLineRandomTest {
 
     @Test
     fun testSameStackTrace() {
-        val server = Server(IntGenerator(), "IntTestDriver", "testDummy")
-        server.underUnitTest = true
-        // Let server run on separate thread so we're not blocked on it forever
-        val t = thread {
-            server.start()
+        testServer(IntGenerator(), "IntTestDriver", "testDummy") { server ->
+            // Ensure exactly 2 calls to random appeared
+            val eiHandler = server.responseHandlers["ei"] ?: error("couldn't find stack trace handler")
+            assertEquals("OK", eiHandler.onPatch(CharArrayReader("[]".toCharArray()).buffered()))
+            val initialGenResult: List<LocWithData> = Json.decodeFromString(eiHandler.onGet())
+            // Should be 8 due to 4 bytes per int
+            assertEquals(8, initialGenResult.size)
         }
-        // Ensure exactly 2 calls to random appeared
-        val eiHandler = server.responseHandlers["ei"] ?: error("couldn't find stack trace handler")
-        assertEquals("OK", eiHandler.onPatch(CharArrayReader("[]".toCharArray()).buffered()))
-        val initialGenResult: List<LocWithData> = Json.decodeFromString(eiHandler.onGet())
-        // Should be 8 due to 4 bytes per int
-        assertEquals(8, initialGenResult.size)
-        // TODO add flag to turn off server
     }
 }
