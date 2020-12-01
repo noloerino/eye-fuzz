@@ -56,7 +56,7 @@ class EiManualMutateGuidance<T>(rng: Random, val genOutputSerializer: (T?) -> St
 
     /**
      * Sets the guidance to read input bytes from the provided file. This automatically calls `reset` to start
-     * a new run, and clears the existing EI map.
+     * a new run, and clears the existing choice map.
      *
      * Until the returned closeable is closed, this guidance can only be used for repro; otherwise, the guidance
      * will read from saved values in the map.
@@ -95,7 +95,7 @@ class EiManualMutateGuidance<T>(rng: Random, val genOutputSerializer: (T?) -> St
     /**
      * When this object is not in repro mode (invoked through `reproWithFile`), this will read existing bytes from
      * the choice map and generate new bytes as necessary. In repro mode, this will read the next byte in the passed
-     * in iterator.
+     * in iterator. See `FuzzState::add` for details.
      */
     override fun getInput(): InputStream {
         return object : InputStream() {

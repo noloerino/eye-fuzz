@@ -72,7 +72,7 @@ private enum class MainThreadTask {
             lock.unlock()
         }
         // Between the above and below line, it is possible for another invocation for requestWork to slip in
-        // Therefore, we must be maintain a task queue rather than a single state variable
+        // Therefore, we must maintain a task queue rather than a single state variable
         lock.lock()
         try {
             // The condition readers[i] is associated with the presence of task hasTask[i]
@@ -107,12 +107,10 @@ private enum class MainThreadTask {
          * Causes the current thread to wait until a job is requested (i.e. the writer condition is signalled).
          * The task is then performed on the main thread, and upon completion, the thread's waiters are signalled.
          *
-         * Must be called on the writer thread.
-         *
-         * @return the requested task item
+         * Must be called on the writer (main) thread if not in testing mode.
          */
         fun waitForJob(server: Server<*>) {
-            require(server.underUnitTest || Thread.currentThread() == server.mainThread) {
+            require(server.isUnderUnitTest || Thread.currentThread() == server.mainThread) {
                 "Jobs must run on the main thread"
             }
             lock.lock()
@@ -152,7 +150,7 @@ class Server<T>(private val gen: Generator<T>,
      * In unit test mode, the behavior of response handlers is exposed, but the actual HTTP server isn't activated.
      * This should be set programmatically before the start() method is called.
      */
-    var underUnitTest = false
+    var isUnderUnitTest = false
 
     internal var isRunning = false
 
@@ -165,7 +163,6 @@ class Server<T>(private val gen: Generator<T>,
             (Class.forName(gen.javaClass.name).genericSuperclass as ParameterizedType)
                     .actualTypeArguments[0] as Class<T>
 
-    /** Tracks the random value stored at a choice, as well as the last line of the stack trace  */
     private val rng = Random()
     internal val genGuidance = EiManualMutateGuidance<T>(rng, genOutputSerializer)
 
@@ -191,7 +188,7 @@ class Server<T>(private val gen: Generator<T>,
         addHandlers(
                 object : ResponseHandler("ei") {
                     /**
-                     * GET returns a list of all EIs in the map.
+                     * GET returns a list of all choices/locations in the map.
                      */
                     override fun onGet(): String {
                         val data = genGuidance.fuzzState.snapshot()
@@ -199,7 +196,8 @@ class Server<T>(private val gen: Generator<T>,
                     }
 
                     /**
-                     * PATCH performs a partial update to EIs, leaving ones that weren't included in the request untouched.
+                     * PATCH performs a partial update to the choice map, leaving choices ones that weren't included in
+                     * the request untouched.
                      */
                     override fun onPatch(reader: BufferedReader): String {
                         val text = reader.readText()
@@ -255,7 +253,7 @@ class Server<T>(private val gen: Generator<T>,
 
     fun start() {
         init()
-        if (!underUnitTest) {
+        if (!isUnderUnitTest) {
             server.start()
             println("Server initialized at port " + server.address.port)
         }
@@ -265,7 +263,7 @@ class Server<T>(private val gen: Generator<T>,
             }
         } finally {
             println("Server exiting")
-            server.stop(if (underUnitTest) 0 else 1)
+            server.stop(if (isUnderUnitTest) 0 else 1)
         }
     }
 
@@ -289,6 +287,9 @@ class Server<T>(private val gen: Generator<T>,
         println("Updated generator contents (map is of size ${genGuidance.fuzzState.mapSize})")
     }
 
+    /**
+     * Shared state for CSV of Jacoco coverage results. Filled by `runTestCase`, consumed by `getTestCaseCov`.
+     */
     private var testResultStream: ByteArrayOutputStream = ByteArrayOutputStream()
 
     private var lastTestResult: Result = Result.INVALID
@@ -382,7 +383,6 @@ class Server<T>(private val gen: Generator<T>,
         val genStatus: GenerationStatus = NonTrackingGenerationStatus(random)
         genGuidance.annotatingRandomSource = random
         genGuidance.fuzzState.genOutput = gen.generate(random, genStatus)
-        // TODO compute these only once
         println(genGuidance.history.runResults.map { it.serializedResult })
         println("generator produced: " + getGenContents())
     }
@@ -419,7 +419,7 @@ class Server<T>(private val gen: Generator<T>,
         }
 
         /**
-         * Replaces the current values in the EI map with the values in the specified file.
+         * Replaces the current values in the choice map with the values in the specified file.
          */
         override fun onPost(reader: BufferedReader): String {
             val text = reader.readText()

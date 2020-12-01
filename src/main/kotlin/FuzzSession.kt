@@ -6,9 +6,9 @@ data class FuzzHistory(val locList: List<StackTraceInfo>, val runResults: List<R
 
 class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val rng: Random) {
     /**
-     * Tracks which EIs were used in the most recent run of the generator.
+     * Tracks which locations were used in the most recent run of the generator.
      *
-     * Since EIs are unique (as visiting the same location twice would result in an incremented count),
+     * Since locations are unique (as visiting the same location twice would result in an incremented count),
      * we're able to use a LinkedSet instead of an ordinary list.
      */
     val usedThisRun = linkedSetOf<StackTraceInfo>()
@@ -29,7 +29,7 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
             currRunResult.serializedResult = guidance.genOutputSerializer(value)
         }
 
-    // hides mutability of diffs, and remove first sentinel node
+    // hides mutability of diffs
     val history: FuzzHistory get() {
         return FuzzHistory(locList.toList(), diffStack)
     }
@@ -56,7 +56,7 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
     }
 
     /**
-     * Adds the EI to the map if not present, and returns the choice made at this EI.
+     * Adds the location to the map if not present, and returns the choice made at this location.
      */
     fun add(stackTraceInfo: StackTraceInfo): Int {
         usedThisRun.add(stackTraceInfo)
@@ -71,7 +71,7 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
     }
 
     /**
-     * Updates the choice corresponding to the stack trace with this value.
+     * Updates the choice corresponding to the location with this value.
      * Because this is exposed to the HTTP API, it takes an index as argument.
      */
     fun update(idx: LocIndex, choice: Int) {
@@ -98,7 +98,7 @@ class FuzzState<T>(private val guidance: EiManualMutateGuidance<T>, private val 
 @Serializable
 class RunResult {
     /**
-     * Looks up the int associated with a particular stack trace, assigning a new one if necessary.
+     * Looks up the int associated with a particular location, assigning a new one if necessary.
      */
     private fun lookupOrStore(newInfo: StackTraceInfo): LocIndex {
         val idx = locList.indexOf(newInfo)

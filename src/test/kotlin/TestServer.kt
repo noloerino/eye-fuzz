@@ -14,7 +14,7 @@ fun <T> testServer(gen: Generator<T>,
                    testFn: (Server<T>) -> Unit) {
     // Initialize the server on the secondary thread to allow the job queue to be happy
     val server: Server<T> = Server(gen, testClassName, testMethod)
-    server.underUnitTest = true
+    server.isUnderUnitTest = true
     val t = thread {
         server.start()
     }
