@@ -154,7 +154,7 @@ class Server<T>(private val gen: Generator<T>,
      */
     var underUnitTest = false
 
-    var isRunning = false
+    internal var isRunning = false
 
     private val testClass = Class.forName(testClassName)
     val mainThread: Thread = Thread.currentThread()
@@ -265,7 +265,7 @@ class Server<T>(private val gen: Generator<T>,
             }
         } finally {
             println("Server exiting")
-            server.stop(1)
+            server.stop(if (underUnitTest) 0 else 1)
         }
     }
 
@@ -304,7 +304,7 @@ class Server<T>(private val gen: Generator<T>,
         println("Starting Jacoco test case run")
         val targetName = TestWrapper::class.java.name
         // TODO make class name array? configurable
-        val compName = com.google.javascript.jscomp.Compiler::class.java.name
+        val compName = "com.google.javascript.jscomp.Compiler"
         val testWrapper = TestWrapper(genGuidance.fuzzState.genOutput, testClass, testMethod, genOutputClass)
         testWrapper.run()
         lastTestResult = testWrapper.lastTestResult
@@ -476,7 +476,6 @@ class Server<T>(private val gen: Generator<T>,
             genGuidance.loadSessionHistory(loadFile)
             MainThreadTask.RERUN_GENERATOR.requestWork()
             return Json.encodeToString(genGuidance.fuzzState.history)
-//            return "OK"
         }
     }
 

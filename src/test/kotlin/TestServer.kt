@@ -38,6 +38,8 @@ fun <T> Server<T>.newSavedSession(name: String, history: FuzzHistory) {
 }
 
 // === FAKE REQUEST UTILITIES ===
+fun <T> Server<T>.getResponseHandler(name: String): ResponseHandler = this.responseHandlers[name]
+        ?: error("couldn't find response handler $name")
 
 fun ResponseHandler.postString(msg: String): String = this.onPost(StringReader(msg).buffered())
 inline fun <reified T> ResponseHandler.postJson(obj: T): String

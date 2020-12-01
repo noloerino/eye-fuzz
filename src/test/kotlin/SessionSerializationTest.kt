@@ -6,6 +6,7 @@ import kotlin.random.Random
 import kotlin.random.asJavaRandom
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Tests that sessions can be serialized and deserialized properly.
@@ -13,6 +14,34 @@ import kotlin.test.assertEquals
 class SessionSerializationTest {
     private val rng = Random(0)
 
+    /**
+     * Tests load/unload behavior for a simple session, checking that the history in the server is exactly
+     * what's loaded in.
+     * Since stack traces may change and there's some weird stuff that happens with the initial load, we only compare
+     * the runResult sequences minus last element.
+     */
+    @Test
+    fun testSimpleSession() {
+        val sessionName = "simple_session0.json"
+        val sessionJson: String = javaClass.getResourceAsStream(sessionName).bufferedReader().use { it.readText() }
+        testServer(JavaScriptCodeGenerator(), "JsTestDriver", "testWithGenerator") { server ->
+            val expHistory: FuzzHistory = Json.decodeFromString(sessionJson)
+            server.newSavedSession("__TEST_$sessionName", expHistory)
+            val loadSessionHandler = server.getResponseHandler("load_session")
+            val sessionList = Json.decodeFromString<List<String>>(loadSessionHandler.onGet())
+            assertTrue(sessionList.contains("__TEST_$sessionName"),
+                    "didn't find saved session __TEST_$sessionName in reported $sessionList")
+            loadSessionHandler.postJson(Server.SaveLoadRequest("__TEST_$sessionName"))
+            // This might be sensitive to server-side stack trace filtering, so only examine RunResult
+            val gotHistory = server.getResponseHandler("history").onGet()
+            // Drop last because the generator is rerun, which produces an extraneous result
+            assertEquals(expHistory.runResults, Json.decodeFromString<FuzzHistory>(gotHistory).runResults.dropLast(1))
+        }
+    }
+
+    /**
+     * Simple unit test for encoding/decoding of a history.
+     */
     @Test
     fun testEncodeDecode() {
         val state = EiManualMutateGuidance<String>(rng.asJavaRandom()) { v -> v.toString() }.fuzzState

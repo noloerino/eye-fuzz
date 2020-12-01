@@ -22,12 +22,14 @@
             <artifactId>org.jacoco.core</artifactId>
             <version>0.8.6</version>
         </dependency>
-        <!-- Google Closure: we want to test this library -->
+        <!-- Google Closure is the primary example used for test cases-->
         <dependency>
             <groupId>com.google.javascript</groupId>
             <artifactId>closure-compiler</artifactId>
             <version>v20180204</version>
+            <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.jetbrains.kotlinx</groupId>
             <artifactId>kotlinx-serialization-core</artifactId>
@@ -75,6 +77,11 @@
         </dependency>
     </dependencies>
     <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+        </testResources>
         <plugins>
             <!-- Set JVM flags on test cases -->
             <plugin>

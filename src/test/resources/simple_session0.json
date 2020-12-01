@@ -1,0 +1,1108 @@
+{
+    "locList": [
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 131,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 0,
+                "intBounds": {
+                    "min": 0,
+                    "max": 7
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 131,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 1,
+                "intBounds": {
+                    "min": 0,
+                    "max": 7
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 131,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 2,
+                "intBounds": {
+                    "min": 0,
+                    "max": 7
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 131,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 3,
+                "intBounds": {
+                    "min": 0,
+                    "max": 7
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 327,
+                    "methodName": "generateVarNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 0,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 327,
+                    "methodName": "generateVarNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 1,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 327,
+                    "methodName": "generateVarNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 2,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 327,
+                    "methodName": "generateVarNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 3,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 89,
+                    "methodName": "nextBoolean"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "BOOLEAN",
+                "byteOffset": 0,
+                "intBounds": null
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 107,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 0,
+                "intBounds": {
+                    "min": 0,
+                    "max": 2
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 107,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 1,
+                "intBounds": {
+                    "min": 0,
+                    "max": 2
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 107,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 2,
+                "intBounds": {
+                    "min": 0,
+                    "max": 2
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 157,
+                    "methodName": "choose"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 107,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHOOSE",
+                "byteOffset": 3,
+                "intBounds": {
+                    "min": 0,
+                    "max": 2
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 110,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 0,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 110,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 1,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 110,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 2,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        },
+        {
+            "stackTrace": [
+                {
+                    "className": "AnnotatingRandomSource",
+                    "fileName": "AnnotatingRandomSource.kt",
+                    "lineNumber": 129,
+                    "methodName": "nextChar"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 249,
+                    "methodName": "generateIdentNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 110,
+                    "methodName": "generateExpression"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 300,
+                    "methodName": "generateReturnNode"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 139,
+                    "methodName": "generateStatement"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 83,
+                    "methodName": "generate"
+                },
+                {
+                    "className": "JavaScriptCodeGenerator",
+                    "fileName": "JavaScriptCodeGenerator.java",
+                    "lineNumber": 50,
+                    "methodName": "generate"
+                }
+            ],
+            "typeInfo": {
+                "kind": "CHAR",
+                "byteOffset": 3,
+                "intBounds": {
+                    "min": 97,
+                    "max": 122
+                }
+            }
+        }
+    ],
+    "runResults": [
+        {
+            "serializedResult": null,
+            "markedUsed": [
+            ],
+            "createChoices": [
+            ],
+            "updateChoices": [
+            ]
+        },
+        {
+            "serializedResult": "var o_0",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "createChoices": [
+                {
+                    "locIndex": 0,
+                    "new": 59
+                },
+                {
+                    "locIndex": 1,
+                    "new": 157
+                },
+                {
+                    "locIndex": 2,
+                    "new": 249
+                },
+                {
+                    "locIndex": 3,
+                    "new": 80
+                },
+                {
+                    "locIndex": 4,
+                    "new": 248
+                },
+                {
+                    "locIndex": 5,
+                    "new": 14
+                },
+                {
+                    "locIndex": 6,
+                    "new": 114
+                },
+                {
+                    "locIndex": 7,
+                    "new": 83
+                }
+            ],
+            "updateChoices": [
+                {
+                    "locIndex": 0,
+                    "old": 59,
+                    "new": 100
+                },
+                {
+                    "locIndex": 1,
+                    "old": 157,
+                    "new": 0
+                },
+                {
+                    "locIndex": 2,
+                    "old": 249,
+                    "new": 0
+                },
+                {
+                    "locIndex": 3,
+                    "old": 80,
+                    "new": 0
+                }
+            ]
+        },
+        {
+            "serializedResult": "continue",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3
+            ],
+            "createChoices": [
+            ],
+            "updateChoices": [
+                {
+                    "locIndex": 4,
+                    "old": 248,
+                    "new": 218
+                },
+                {
+                    "locIndex": 5,
+                    "old": 14,
+                    "new": 0
+                },
+                {
+                    "locIndex": 6,
+                    "old": 114,
+                    "new": 0
+                },
+                {
+                    "locIndex": 7,
+                    "old": 83,
+                    "new": 0
+                }
+            ]
+        },
+        {
+            "serializedResult": "continue",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3
+            ],
+            "createChoices": [
+            ],
+            "updateChoices": [
+                {
+                    "locIndex": 0,
+                    "old": 100,
+                    "new": 1
+                },
+                {
+                    "locIndex": 1,
+                    "old": 0,
+                    "new": 0
+                },
+                {
+                    "locIndex": 2,
+                    "old": 0,
+                    "new": 0
+                },
+                {
+                    "locIndex": 3,
+                    "old": 0,
+                    "new": 0
+                }
+            ]
+        },
+        {
+            "serializedResult": "break",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3
+            ],
+            "createChoices": [
+            ],
+            "updateChoices": [
+                {
+                    "locIndex": 0,
+                    "old": 1,
+                    "new": 3
+                },
+                {
+                    "locIndex": 1,
+                    "old": 0,
+                    "new": 0
+                },
+                {
+                    "locIndex": 2,
+                    "old": 0,
+                    "new": 0
+                },
+                {
+                    "locIndex": 3,
+                    "old": 0,
+                    "new": 0
+                }
+            ]
+        },
+        {
+            "serializedResult": "return (f_0)",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16
+            ],
+            "createChoices": [
+                {
+                    "locIndex": 8,
+                    "new": 56
+                },
+                {
+                    "locIndex": 9,
+                    "new": 235
+                },
+                {
+                    "locIndex": 10,
+                    "new": 228
+                },
+                {
+                    "locIndex": 11,
+                    "new": 145
+                },
+                {
+                    "locIndex": 12,
+                    "new": 0
+                },
+                {
+                    "locIndex": 13,
+                    "new": 23
+                },
+                {
+                    "locIndex": 14,
+                    "new": 237
+                },
+                {
+                    "locIndex": 15,
+                    "new": 182
+                },
+                {
+                    "locIndex": 16,
+                    "new": 194
+                }
+            ],
+            "updateChoices": [
+                {
+                    "locIndex": 4,
+                    "old": 218,
+                    "new": 201
+                },
+                {
+                    "locIndex": 5,
+                    "old": 0,
+                    "new": 0
+                },
+                {
+                    "locIndex": 6,
+                    "old": 0,
+                    "new": 0
+                },
+                {
+                    "locIndex": 7,
+                    "old": 0,
+                    "new": 0
+                }
+            ]
+        },
+        {
+            "serializedResult": "return (f_0)",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16
+            ],
+            "createChoices": [
+            ],
+            "updateChoices": [
+                {
+                    "locIndex": 13,
+                    "old": 23,
+                    "new": 197
+                },
+                {
+                    "locIndex": 14,
+                    "old": 237,
+                    "new": 0
+                },
+                {
+                    "locIndex": 15,
+                    "old": 182,
+                    "new": 0
+                },
+                {
+                    "locIndex": 16,
+                    "old": 194,
+                    "new": 0
+                }
+            ]
+        },
+        {
+            "serializedResult": "return (w_0)",
+            "markedUsed": [
+                0,
+                1,
+                2,
+                3,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16
+            ],
+            "createChoices": [
+            ],
+            "updateChoices": [
+            ]
+        }
+    ]
+}

@@ -7,21 +7,23 @@ import edu.berkeley.cs.jqf.fuzz.JQF;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import static org.junit.Assume.assumeTrue;
-
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
+/**
+ * Taken more or less from JQF demos
+ */
 @RunWith(JQF.class)
-public class DummyTest {
+public class JsTestDriver {
     static {
         // Disable all logging by Closure passes, to speed up fuzzing
         java.util.logging.LogManager.getLogManager().reset();
     }
 
     // Compiler, options, and predefined JS environment
-    private Compiler compiler = new Compiler(new PrintStream(new ByteArrayOutputStream(), false));
-    private CompilerOptions options = new CompilerOptions();
-    private SourceFile externs = SourceFile.fromCode("externs", "");
+    private final Compiler compiler = new Compiler(new PrintStream(new ByteArrayOutputStream(), false));
+    private final CompilerOptions options = new CompilerOptions();
+    private final SourceFile externs = SourceFile.fromCode("externs", "");
 
     @Before // Runs before tests are executed
     public void initCompiler() {

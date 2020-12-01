@@ -4,16 +4,28 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.io.CharArrayReader
-import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class EdgeCaseTests {
-    class IntGenerator : Generator<Int>(Int::class.java) {
+    class OneLineIntGenerator : Generator<Int>(Int::class.java) {
         override fun generate(random: SourceOfRandomness, status: GenerationStatus): Int {
             // These must be on the same line
-            return makeInt(random.nextInt(0, 256), random.nextInt(0, 256))
+            return makeInt(random.nextInt(0, 0x10000), random.nextInt(0, 0x10000))
+        }
+
+        // Takes a as upper 2 bytes and b as lower 2 bytes
+        private fun makeInt(a: Int, b: Int): Int = (a shl 16) or (b and 0xFFFF)
+    }
+
+    class TwoLineIntGenerator : Generator<Int>(Int::class.java) {
+        override fun generate(random: SourceOfRandomness, status: GenerationStatus): Int {
+            // These must be on different lines
+            return makeInt(
+                    random.nextInt(0, 0x10000),
+                    random.nextInt(0, 0x10000)
+            )
         }
 
         // Takes a as upper 2 bytes and b as lower 2 bytes
@@ -27,7 +39,7 @@ class EdgeCaseTests {
     @Test
     fun testLittleEndianLoad() {
         val fileName = "__TEST_LE"
-        testServer(IntGenerator(), "IntTestDriver", "testDummy") { server ->
+        testServer(TwoLineIntGenerator(), "IntTestDriver", "testDummy") { server ->
             // IntGenerator produces 2 ints and combines their lower 2 bytes together
             // Combining 0xCCCCDEAD (generated first) with 0xCCCCBEEF will give us 0xDEADBEEF.
             server.newSavedInput(fileName,
@@ -35,10 +47,12 @@ class EdgeCaseTests {
                     intArrayOf(0xAD, 0xDE, 0xCC, 0xCC, 0xEF, 0xBE, 0xCC, 0xCC)
                             .map { it.toByte() }
                             .toByteArray())
-            val loadHandler = server.responseHandlers["load_input"] ?: error("couldn't find saved input load handler")
+            val loadHandler = server.getResponseHandler("load_input")
             val fileList = Json.decodeFromString<List<String>>(loadHandler.onGet())
             assertTrue(fileList.contains(fileName), "didn't find saved input $fileName in reported $fileList")
             assertEquals("OK", loadHandler.postJson(Server.SaveLoadRequest(fileName)))
+            val genHandler = server.getResponseHandler("generator")
+            assertEquals(0xDEADBEEF.toInt().toString(), genHandler.postString(""))
         }
     }
 
@@ -48,9 +62,9 @@ class EdgeCaseTests {
      */
     @Test
     fun testSameStackTrace() {
-        testServer(IntGenerator(), "IntTestDriver", "testDummy") { server ->
+        testServer(OneLineIntGenerator(), "IntTestDriver", "testDummy") { server ->
             // Ensure exactly 2 calls to random appeared
-            val eiHandler = server.responseHandlers["ei"] ?: error("couldn't find stack trace handler")
+            val eiHandler = server.getResponseHandler("ei")
             assertEquals("OK", eiHandler.onPatch(CharArrayReader("[]".toCharArray()).buffered()))
             val initialGenResult: List<LocWithData> = Json.decodeFromString(eiHandler.onGet())
             // Should be 8 due to 4 bytes per int
