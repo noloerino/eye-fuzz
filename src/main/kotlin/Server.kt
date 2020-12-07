@@ -140,10 +140,18 @@ private enum class MainThreadTask {
 class Server<T>(private val gen: Generator<T>,
                 testClassName: String,
                 private val testMethod: String,
+                private val covClassNames: List<String>,
                 private val genOutputSerializer: (T?) -> String = { v -> v.toString() }) {
     // WARNING: IF EVER THE SERVER GOES BACK TO USING ZEST ExecutionIndex,
     // PASSING toString AS A DEFAULT ARGUMENT WILL BREAK EI TRACKING FOR SOME DUMB REASON
     // FIX: CREATE A SECOND CONSTRUCTOR THAT PASSES A DEFAULT toString
+
+    init {
+        covClassNames.forEach { className ->
+            require(this::class.java.getResource("/${className.replace('.', '/')}.class") != null)
+                { "Couldn't find coverage class $className" }
+        }
+    }
 
     /**
      * Determines whether the server is being run in unit test mode.
@@ -303,9 +311,6 @@ class Server<T>(private val gen: Generator<T>,
         fun getTargetClass(targetName: String) = this::class.java
                 .getResourceAsStream("/${targetName.replace('.', '/')}.class")
         println("Starting Jacoco test case run")
-        val targetName = TestWrapper::class.java.name
-        // TODO make class name array? configurable
-        val compName = "com.google.javascript.jscomp.Compiler"
         val testWrapper = TestWrapper(genGuidance.fuzzState.genOutput, testClass, testMethod, genOutputClass)
         testWrapper.run()
         lastTestResult = testWrapper.lastTestResult
@@ -321,14 +326,13 @@ class Server<T>(private val gen: Generator<T>,
         val executionData = loader.executionDataStore
         val coverageBuilder = CoverageBuilder()
         val analyzer = Analyzer(executionData, coverageBuilder)
-        getTargetClass(targetName).use {
-            analyzer.analyzeClass(it, targetName)
-        }
         getTargetClass(testClass.name).use {
             analyzer.analyzeClass(it, testClass.name)
         }
-        getTargetClass(compName).use {
-            analyzer.analyzeClass(it, compName)
+        covClassNames.forEach { className ->
+            getTargetClass(className).use {
+                analyzer.analyzeClass(it, className)
+            }
         }
 
         // https://www.jacoco.org/jacoco/trunk/doc/examples/java/ReportGenerator.java

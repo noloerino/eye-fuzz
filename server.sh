@@ -16,7 +16,7 @@ if [ ! -f "$JS_PATH" ]; then
 fi
 
 print_usage() {
-    echo "Usage: $0 [-c CLASSPATH] GENERATOR_CLASS_NAME TEST_CLASS_NAME TEST_METHOD_NAME [SERIALIZER_CLASS] [SERIALIZER_FUNC]"
+    echo "Usage: $0 [-c CLASSPATH] GENERATOR_CLASS_NAME TEST_CLASS_NAME TEST_METHOD_NAME COVERAGE_CLASS_NAMES [SERIALIZER_CLASS] [SERIALIZER_FUNC]"
 }
 
 CLASSPATH=".:$JAR_PATH"
@@ -39,4 +39,4 @@ java -ea \
     -cp "$CLASSPATH" \
     -javaagent:./jacocoagent.jar \
     "$MAIN_PATH" \
-    $@
+    "$@"

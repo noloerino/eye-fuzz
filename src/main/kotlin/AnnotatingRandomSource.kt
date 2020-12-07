@@ -62,6 +62,12 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     var depth = 0
     private var choiceState: RandomChoiceState? = null
 
+    /*
+     * a(randBool())
+     *
+     * a(multiple) { if (multiple) for () { random() } random(); }
+     */
+
     // TODO do some kind of caching for stack traces to ensure that when a new one is encountered, the relevant
     // count is incremented
     //
@@ -83,7 +89,9 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     //   }
     //
     // - Function B is called twice in one occurrence at A; B performs an invocation to C each time (check is true)
+    //   (A1, B1, C1), (A1, B2, C1)
     // - Function C is called twice at B; B is called once at A; B calls C twice (check is false)
+    //   (A1, B1, C1), (A1, B1, C2)
     //
     // Unlike Zest, we cannot meaningfully distinguish between these two cases because random() has no additional
     // knowledge about where B()/C() was invoked besides line number. The only thing we can count is how many times

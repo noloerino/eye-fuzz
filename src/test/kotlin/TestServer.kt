@@ -11,9 +11,10 @@ import kotlin.concurrent.thread
 fun <T> testServer(gen: Generator<T>,
                    testClassName: String,
                    testMethod: String,
+                   covClassNames: List<String>,
                    testFn: (Server<T>) -> Unit) {
     // Initialize the server on the secondary thread to allow the job queue to be happy
-    val server: Server<T> = Server(gen, testClassName, testMethod)
+    val server: Server<T> = Server(gen, testClassName, testMethod, covClassNames)
     server.isUnderUnitTest = true
     val t = thread {
         server.start()

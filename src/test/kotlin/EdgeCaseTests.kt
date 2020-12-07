@@ -39,7 +39,7 @@ class EdgeCaseTests {
     @Test
     fun testLittleEndianLoad() {
         val fileName = "__TEST_LE"
-        testServer(TwoLineIntGenerator(), "IntTestDriver", "testDummy") { server ->
+        testServer(TwoLineIntGenerator(), "IntTestDriver", "testDummy", listOf()) { server ->
             // IntGenerator produces 2 ints and combines their lower 2 bytes together
             // Combining 0xCCCCDEAD (generated first) with 0xCCCCBEEF will give us 0xDEADBEEF.
             server.newSavedInput(fileName,
@@ -62,7 +62,7 @@ class EdgeCaseTests {
      */
     @Test
     fun testSameStackTrace() {
-        testServer(OneLineIntGenerator(), "IntTestDriver", "testDummy") { server ->
+        testServer(OneLineIntGenerator(), "IntTestDriver", "testDummy", listOf()) { server ->
             // Ensure exactly 2 calls to random appeared
             val eiHandler = server.getResponseHandler("ei")
             assertEquals("OK", eiHandler.onPatch(CharArrayReader("[]".toCharArray()).buffered()))

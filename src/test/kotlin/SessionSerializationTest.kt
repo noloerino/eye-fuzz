@@ -24,7 +24,8 @@ class SessionSerializationTest {
     fun testSimpleSession() {
         val sessionName = "simple_session0.json"
         val sessionJson: String = javaClass.getResourceAsStream(sessionName).bufferedReader().use { it.readText() }
-        testServer(JavaScriptCodeGenerator(), "JsTestDriver", "testWithGenerator") { server ->
+        testServer(JavaScriptCodeGenerator(), "JsTestDriver", "testWithGenerator",
+                listOf("com.google.javascript.jscomp.Compiler")) { server ->
             val expHistory: FuzzHistory = Json.decodeFromString(sessionJson)
             server.newSavedSession("__TEST_$sessionName", expHistory)
             val loadSessionHandler = server.getResponseHandler("load_session")
@@ -72,7 +73,8 @@ class SessionSerializationTest {
                     "TestClass",
                     "TestFile.java",
                     0,
-                    "testMethod"
+                    "testMethod",
+                    0
             )
         }
         // everything is byte for simplicity
