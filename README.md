@@ -28,7 +28,8 @@ where `<classpath>` is the build directory containing your JAR or class files of
 - `TEST_CLASS_NAME`: the name of the test driver class
 - `TEST_METHOD_NAME`: the name of the method on the test driver to be invoked
 - `COVERAGE_CLASS_NAMES`: comma-separate list of class names for Jacoco to collect coverage on, for example
-    `com.google.javascript.jscomp.Compiler,com.google.javascript.jscomp.CompilerOptions`
+    `com.google.javascript.jscomp.Compiler,com.google.javascript.jscomp.CompilerOptions` (coverage is automatically
+    collected on the test case class; pass empty quotes for no additional classes)
 - \[optional\] `SERIALIZER_CLASS`: a class containing a method to serialize the generator output
 - \[optional\] `SERIALIZER_FUNC`: a method to transform the generator output into a human-readable string
 
