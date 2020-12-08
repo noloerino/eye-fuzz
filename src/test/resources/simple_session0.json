@@ -34,7 +34,8 @@
                     "min": 0,
                     "max": 7
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -70,7 +71,8 @@
                     "min": 0,
                     "max": 7
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -106,7 +108,8 @@
                     "min": 0,
                     "max": 7
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -142,7 +145,8 @@
                     "min": 0,
                     "max": 7
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -190,7 +194,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -238,7 +243,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -286,7 +292,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -334,7 +341,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -373,7 +381,8 @@
                 "kind": "BOOLEAN",
                 "byteOffset": 0,
                 "intBounds": null
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -421,7 +430,8 @@
                     "min": 0,
                     "max": 2
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -469,7 +479,8 @@
                     "min": 0,
                     "max": 2
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -517,7 +528,8 @@
                     "min": 0,
                     "max": 2
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -565,7 +577,8 @@
                     "min": 0,
                     "max": 2
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -619,7 +632,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -673,7 +687,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -727,7 +742,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         },
         {
             "stackTrace": [
@@ -781,7 +797,8 @@
                     "min": 97,
                     "max": 122
                 }
-            }
+            },
+            "count": 0
         }
     ],
     "runResults": [

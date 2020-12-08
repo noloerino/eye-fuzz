@@ -8,7 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class EdgeCaseTests {
+class EdgeCaseTest {
     class OneLineIntGenerator : Generator<Int>(Int::class.java) {
         override fun generate(random: SourceOfRandomness, status: GenerationStatus): Int {
             // These must be on the same line

@@ -3,8 +3,14 @@ import kotlinx.serialization.Serializable
 typealias LocIndex = Int
 typealias Choice = Int
 
+/**
+ * Because stack traces are not unique if you have two function calls on the same line, we need to add
+ * a count variable to track ints. This isn't as strong as Zest ExecutionIndexing, but it's a weak substitute.
+ *
+ * If count is 0, that means this was the first occurrence of the provided stack trace on this run.
+ */
 @Serializable
-data class StackTraceInfo(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo)
+data class StackTraceInfo(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo, val count: Int)
 
 /**
  * Allows for compression of stack traces and type info by storing integer indices instead of the full data every time.
@@ -41,7 +47,6 @@ fun StackTraceElement.toLine(): StackTraceLine = StackTraceLine(
         this.fileName,
         this.lineNumber,
         this.methodName,
-        0 // TODO
 )
 
 /**
@@ -54,5 +59,7 @@ data class StackTraceLine(
         val fileName: String?,
         val lineNumber: Int,
         val methodName: String,
-        val count: Int
-)
+) {
+    override fun toString(): String = "$className.$methodName($fileName:$lineNumber)"
+}
+

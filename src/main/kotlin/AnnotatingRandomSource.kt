@@ -51,6 +51,8 @@ private fun getCurrentStackTrace(): StackTrace {
     return full.subList(randIdx, stubIdx)
 }
 
+private var reportedIdenticalStackTrace = false
+
 /**
  * Intercepts calls to FastSourceOfRandomness and annotates it with relevant type information and stack traces.
  * A new instance of this class is created on each generator run.
@@ -68,9 +70,6 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
      * a(multiple) { if (multiple) for () { random() } random(); }
      */
 
-    // TODO do some kind of caching for stack traces to ensure that when a new one is encountered, the relevant
-    // count is incremented
-    //
     // Consider the case where we have two identical stack traces (A, B, C), where A, B, and C are all functions that
     // have only a single line.
     // There are at least two distinct ways this could have occurred, both of which may plausibly be possible in the
@@ -103,6 +102,17 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     // invocation of random(). It is not enough to say "the third occurrence of (A, B, C) should correspond to this
     // byte" because the third occurrence might be a different random() invocation on every run. This would become
     // especially apparent in repro bugs.
+    //
+    // That said, maintaining a set of seen stack traces will at least help simple cases with minimal control flow.
+    // Although history may still be broken, distinctions can still be made between multiple calls to the same
+    // function on the same line, e.g. in a for loop.
+    //
+    // Because a new AnnotatingRandomSource is initialized for each run, we can just use an instance variable.
+
+    /**
+     * Maps stack traces to the number of times the same stack trace was seen during a run.
+     */
+    private val seenStackTraces = mutableMapOf<StackTrace, Int>()
 
     /**
      * Returns an object representing type information for the last retrieved byte.
@@ -112,7 +122,28 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
      */
     fun consumeNextStackTraceInfo(): StackTraceInfo {
         val s = choiceState!!
-        return StackTraceInfo(s.stackTrace, ByteTypeInfo(s.currType, s.currOfs++, s.currBounds))
+        val count = if (seenStackTraces.containsKey(s.stackTrace)) {
+            val n = seenStackTraces[s.stackTrace]!!
+            // Only report once to avoid flooding
+            if (n == 1) {
+                System.err.println("WARNING: Found random() function calls with identical stack trace:")
+                s.stackTrace.forEach { System.err.println("\t$it") }
+                if (!reportedIdenticalStackTrace) {
+                    reportedIdenticalStackTrace = true
+                    System.err.println("Distinct function calls with different stack traces may break history reproduction.")
+                    System.err.println("If possible, consider separating calls to random() within the generator onto different lines.")
+                }
+            }
+            n
+        } else {
+            0
+        }
+        seenStackTraces[s.stackTrace] = count + 1
+        return StackTraceInfo(
+                s.stackTrace,
+                ByteTypeInfo(s.currType, s.currOfs++, s.currBounds),
+                count
+        )
     }
 
     private fun delegateWrapper(choiceKind: ChoiceKind, bounds: Bounds? = null): Closeable {

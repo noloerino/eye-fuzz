@@ -74,11 +74,10 @@ class SessionSerializationTest {
                     "TestFile.java",
                     0,
                     "testMethod",
-                    0
             )
         }
         // everything is byte for simplicity
         val typeInfo = ByteTypeInfo(ChoiceKind.BYTE, 0, null)
-        return StackTraceInfo(stackTrace, typeInfo)
+        return StackTraceInfo(stackTrace, typeInfo, 0)
     }
 }
