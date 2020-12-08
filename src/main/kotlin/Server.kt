@@ -174,7 +174,8 @@ class Server<T>(private val gen: Generator<T>,
     private val rng = Random()
     internal val genGuidance = EiManualMutateGuidance<T>(rng, genOutputSerializer)
 
-    private val server = HttpServer.create(InetSocketAddress("localhost", 8000), 0)
+    // Does not bind to port immediately
+    private val server = HttpServer.create()
 
     /**
      * A map of response handlers. Used to allow test cases to easily access the server without having to
@@ -262,6 +263,7 @@ class Server<T>(private val gen: Generator<T>,
     fun start() {
         init()
         if (!isUnderUnitTest) {
+            server.bind(InetSocketAddress("localhost", 8000), 0)
             server.start()
             println("Server initialized at port " + server.address.port)
         }
@@ -271,7 +273,9 @@ class Server<T>(private val gen: Generator<T>,
             }
         } finally {
             println("Server exiting")
-            server.stop(if (isUnderUnitTest) 0 else 1)
+            if (!isUnderUnitTest) {
+                server.stop(1)
+            }
         }
     }
 
