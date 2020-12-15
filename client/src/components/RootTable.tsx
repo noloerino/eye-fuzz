@@ -73,6 +73,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
      */
     historyDepth: number;
 
+    genTabMouseOver = false;
+    covTabMouseOver = false;
+
     resetHistoryDepth() {
         this.historyDepth = 1;
     }
@@ -202,7 +205,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         return (
             <>
                 <table id="controlPanel">
-                    <caption style={{textAlign: "left"}}>Controls</caption>
+                    <caption style={{textAlign: "left", fontWeight: "bold"}}>Controls</caption>
                     <thead>
                         <th>Generator</th>
                         <th>Test Coverage</th>
@@ -410,13 +413,25 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                 <br />
                 <table>
                     <tr>
-                        <th style={{fontWeight: (this.activeTab === ActiveTab.EI) ? "bold" : "normal"}}
-                            onclick={() => {this.activeTab = ActiveTab.EI}}
+                        <th style={{
+                                fontWeight: (this.activeTab === ActiveTab.EI) ? "bold" : "normal",
+                                cursor: "pointer",
+                                textDecoration: this.genTabMouseOver ? "underline" : undefined
+                        }}
+                            onclick={() => this.activeTab = ActiveTab.EI}
+                            onmouseover={() => this.genTabMouseOver = true}
+                            onmouseout={() => this.genTabMouseOver = false}
                         >
                             Generator Data
                         </th>
-                        <th style={{fontWeight: (this.activeTab === ActiveTab.COV) ? "bold" : "normal"}}
-                            onclick={() => {this.activeTab = ActiveTab.COV}}
+                        <th style={{
+                                fontWeight: (this.activeTab === ActiveTab.COV) ? "bold" : "normal",
+                                cursor: "pointer",
+                                textDecoration: this.covTabMouseOver ? "underline" : undefined
+                            }}
+                            onclick={() => this.activeTab = ActiveTab.COV}
+                            onmouseover={() => this.covTabMouseOver = true}
+                            onmouseout={() => this.covTabMouseOver = false}
                         >
                             Coverage Data
                         </th>
@@ -428,6 +443,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             <tbody>
                             <tr>
                                 <td>
+                                    <div style={{ overflow: "auto" }}>
                                     {this.displayTypedEi
                                         ? <EiTypedDisplay typedData={addTypeInfo(this.currRunInfo.eiTableData)}
                                                           locList={this.history.locList}
@@ -446,7 +462,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                          renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
                                                          classNameFilter={this.classNameFilter} />
                                     }
-
+                                    </div>
                                 </td>
                                 <td>
                                     <GenOutputDisplay currOutput={this.currRunInfo.genOutput}
@@ -458,10 +474,12 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                         </table>
                     ) : (
                         <>
-                            <span><b>Status:</b> {this.testCov.status}</span>
+                            <span><b>Test Status:</b> {this.testCov.status}</span>
                             <table>
-                                {this.testCov.cov.split("\n").map(
-                                    row => <tr>{row.split(",").map(e => <td>{e}</td>)}</tr>)
+                                {this.testCov.cov.split("\n").filter(row => row.length > 0).map(
+                                    (row, i) => <tr>{row.split(",").map(
+                                        e => i === 0 ? (<th>{e}</th>) : <td>{e}</td>
+                                    )}</tr>)
                                 }
                             </table>
                         </>

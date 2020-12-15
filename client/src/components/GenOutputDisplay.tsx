@@ -11,8 +11,9 @@ type GenOutputDisplayAttrs = {
 
 const GEN_CELL_STYLE = {
     maxHeight: "20em",
-    maxWidth: "30em",
+    maxWidth: "40em",
     whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
     fontSize: 14,
     fontFamily: '"PT Mono", "Courier"'
 };

@@ -18,6 +18,13 @@ import java.net.InetSocketAddress
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 
+fun eprintln(msg: String) {
+    // ANSI RED
+    System.err.print("\u001B[0;31m")
+    System.err.print(msg)
+    // ANSI RESET
+    System.err.println("\u001B[0m")
+}
 
 /**
  * Since the main thread is the only thread that can run the generator, threads of the HTTP server will have to

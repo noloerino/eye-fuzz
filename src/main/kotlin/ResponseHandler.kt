@@ -46,7 +46,7 @@ abstract class ResponseHandler(val name: String) : HttpHandler {
             }
             httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
         } catch (e: Exception) {
-            System.err.println("Exception in handling $method /$name")
+            eprintln("Exception in handling $method /$name")
             e.printStackTrace()
             httpExchange.sendResponseHeaders(503, 0)
             exitProcess(1)

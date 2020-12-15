@@ -126,12 +126,12 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
             val n = seenStackTraces[s.stackTrace]!!
             // Only report once to avoid flooding
             if (n == 1) {
-                System.err.println("WARNING: Found random() function calls with identical stack trace:")
-                s.stackTrace.forEach { System.err.println("\t$it") }
+                eprintln("WARNING: Found random() function calls with identical stack trace:")
+                s.stackTrace.forEach { eprintln("\t$it") }
                 if (!reportedIdenticalStackTrace) {
                     reportedIdenticalStackTrace = true
-                    System.err.println("Distinct function calls with different stack traces may break history reproduction.")
-                    System.err.println("If possible, consider separating calls to random() within the generator onto different lines.")
+                    eprintln("=== Distinct function calls with different stack traces may break history reproduction.")
+                    eprintln("=== If possible, consider separating calls to random() within the generator onto different lines.")
                 }
             }
             n
@@ -212,7 +212,7 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     }
 
     override fun nextInt(n: Int): Int {
-        return delegateWrapper(ChoiceKind.INT).use { super.nextInt(n) }
+        return delegateWrapper(ChoiceKind.INT, Bounds(0, n)).use { super.nextInt(n) }
     }
 
     override fun nextInt(min: Int, max: Int): Int {
