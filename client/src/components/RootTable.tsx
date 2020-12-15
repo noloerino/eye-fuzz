@@ -76,6 +76,8 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     genTabMouseOver = false;
     covTabMouseOver = false;
 
+    loaded = false;
+
     resetHistoryDepth() {
         this.historyDepth = 1;
     }
@@ -107,6 +109,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
         this.getLoadFiles();
         this.getLoadSessions();
         this.getTestCov();
+        this.loaded = true;
     }
 
     // Returns a promise to allow us to await on the result on this request
@@ -202,7 +205,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
     }
 
     view() {
-        return (
+        return this.loaded ? (
             <>
                 <table id="controlPanel">
                     <caption style={{textAlign: "left", fontWeight: "bold"}}>Controls</caption>
@@ -486,6 +489,6 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                     )
                 }
             </>
-        );
+        ) : "Loading...";
     }
 }
