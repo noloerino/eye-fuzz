@@ -1,19 +1,20 @@
 import m, {Vnode} from "mithril";
-// Necessary to prevent mithril from getting dead code eliminated...
-const _m = m;
 import {
     Bounds,
+    ChoiceKind,
     FuzzHistory,
+    getByte,
     LocIndex,
     LocWithData,
+    setByte,
     StackTraceInfo,
     StackTraceLine,
     TypedLocWithData,
-    getByte,
-    setByte,
 } from "../common";
 import {TOOLTIP_NEW_VALUE, TOOLTIP_STACK_TRACE, TOOLTIP_TYPE_INFO, TOOLTIP_USED} from "../tooltips";
 import {MithrilTsxComponent} from "mithril-tsx-component";
+// Necessary to prevent mithril from getting dead code eliminated...
+const _m = m;
 
 type StackTraceCellAttrs = {
     classNameFilter: string,
@@ -55,6 +56,17 @@ function serializeStackTraceLine(l: StackTraceLine): string {
     return `${l.className}#${l.methodName}()@${l.lineNumber}`;
 }
 
+function renderKind(kind: ChoiceKind): string {
+    switch (kind) {
+        case ChoiceKind.BYTE_ARRAY:
+            return "byte array";
+        case ChoiceKind.CHOOSE:
+            return "array index";
+        default:
+            return kind.toLowerCase();
+    }
+}
+
 export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
     view(vnode: Vnode<ByteDisplayAttrs, this>) {
         return (
@@ -83,7 +95,7 @@ export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
                             </td>
                             <td>
                                 <span title={"The type this call to random() produced"}>
-                                    Data type: {typeInfo.kind}
+                                    Data type: {renderKind(typeInfo.kind)}
                                 </span>
                                 <br />
                                 <span title={"The offset within the type that this byte accounted for"}>
@@ -160,6 +172,9 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
     view(vnode: Vnode<TypedDisplayAttrs, this>) {
         let historicChoices = vnode.attrs.historicChoices;
         let renderer = vnode.attrs.renderer;
+        let typedChoices = vnode.attrs.newTypedChoices;
+        // Workaround for inability to declare variables in JSX
+        let _oldValue = 0;
         return (
             <table>
                 <thead>
@@ -192,7 +207,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                 <input type="checkbox" disabled={true} checked={used} />
                             </td>
                             <td style={{textAlign: "center"}}>
-                                {kind}
+                                {renderKind(kind)}
                                 {/* IMPORTANT: do not use the bounds argument of the renderer since these ARE the bounds */}
                                 {intBounds && ` [${renderer(intBounds.min)}, ${renderer(intBounds.max)})`}
                             </td>
@@ -200,26 +215,30 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                 <span>{
                                     // If the key is absent, then the value is the same as the current choice; if it
                                     // is present but null then it didn't yet exist
-                                    renderer(
-                                        descendantIndices.some((eiIndex) => historicChoices.has(eiIndex))
+                                    (_oldValue = descendantIndices.some((eiIndex) => historicChoices.has(eiIndex))
                                         ? computeOldChoice(choice, descendantIndices, historicChoices)
-                                        : choice,
-                                        intBounds ?? undefined
-                                    )
+                                        : choice)
+                                    && (kind === ChoiceKind.BOOLEAN)
+                                        ? (_oldValue % 2 ? "true" : "false")
+                                        : renderer(_oldValue, intBounds ?? undefined)
                                 }</span>
                             </td>
                             <td style={{textAlign: "center"}}>
-                                <span>{renderer(choice, intBounds ?? undefined)}</span>
+                                <span>{
+                                    kind === ChoiceKind.BOOLEAN
+                                        ? (choice % 2 ? "true" : "false")
+                                        : renderer(choice, intBounds ?? undefined)
+                                }</span>
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="number" min={intBounds?.min} max={intBounds?.max} value={
-                                    vnode.attrs.newTypedChoices.get(i) || vnode.attrs.newTypedChoices.get(i) === 0
-                                            ? (vnode.attrs.newTypedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
+                                    typedChoices.get(i) || typedChoices.get(i) === 0
+                                            ? (typedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
                                             : ""}
                                         oninput={(e: InputEvent) => {
                                             let value = (e.target as HTMLInputElement)?.value ?? "";
                                             if (value === "") {
-                                                vnode.attrs.newTypedChoices.delete(i);
+                                                typedChoices.delete(i);
                                                 vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex) => {
                                                     vnode.attrs.newEiChoices.delete(eiIndex);
                                                 });
@@ -235,7 +254,7 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                                     // console.log(`getting ${v}, which will become ${v + intBounds.min}`)
                                                     v += intBounds.min;
                                                 }
-                                                vnode.attrs.newTypedChoices.set(i, v);
+                                                typedChoices.set(i, v);
                                                 vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex, ofs) => {
                                                     vnode.attrs.newEiChoices.set(eiIndex, getByte(v, ofs));
                                                 });
