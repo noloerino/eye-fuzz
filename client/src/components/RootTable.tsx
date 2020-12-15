@@ -53,7 +53,7 @@ enum ActiveTab {
 }
 
 export class RootTable extends MithrilTsxComponent<{ }> {
-    displayTypedEi: boolean = false; // true;
+    displayTypedEi: boolean = true;
     history: FuzzHistory = { locList: [], runResults: [] };
     currRunInfo: RunInfo = { eiTableData: [], genOutput: ""};
     newEiChoices: Map<LocIndex, number> = new Map();

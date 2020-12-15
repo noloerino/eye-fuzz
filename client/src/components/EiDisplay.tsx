@@ -213,8 +213,8 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="number" min={intBounds?.min} max={intBounds?.max} value={
-                                    vnode.attrs.newTypedChoices.get(i)
-                                        ? (vnode.attrs.newTypedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
+                                    vnode.attrs.newTypedChoices.get(i) || vnode.attrs.newTypedChoices.get(i) === 0
+                                            ? (vnode.attrs.newTypedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
                                             : ""}
                                         oninput={(e: InputEvent) => {
                                             let value = (e.target as HTMLInputElement)?.value ?? "";
