@@ -9,6 +9,7 @@ local Java HTTP server, and performs updates to those bytes and the resulting pr
 The following build tools are needed:
 - [Maven](https://maven.apache.org/install.html)
 - [yarn](https://classic.yarnpkg.com/en/docs/install/)
+
 This project has been configured to build and run under JDK/JRE 8 - it may work on newer versions of Java, but
 it has not been tested.
 
