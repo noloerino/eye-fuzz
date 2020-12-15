@@ -122,7 +122,7 @@ export function addTypeInfo(locs: LocWithData[]): TypedLocWithData[] {
         }
         curr!!.descendantIndices.push(i)
         // fine to |= because we assume those bytes haven't been filled yet
-        curr!!.choice |= (choice << (8 * typeInfo.byteOffset));
+        curr!!.choice |= ((choice & 0xFF) << (8 * typeInfo.byteOffset));
     });
     if (curr != null) {
         arr.push(curr);

@@ -52,6 +52,18 @@ enum ActiveTab {
     COV
 }
 
+// Capitalizes only the first letter of string and every letter following a space
+function capitalize(phrase: string) {
+    // Fake first space for more elegant code
+    phrase = " " + phrase;
+    // Convert to char array
+    let chrs = phrase.trimEnd().toLowerCase().split("");
+    for (let i = 0; i != -1; i = phrase.indexOf(" ", i + 1)) {
+        chrs[i + 1] = chrs[i + 1].toUpperCase();
+    }
+    return chrs.join("")
+}
+
 export class RootTable extends MithrilTsxComponent<{ }> {
     displayTypedEi: boolean = true;
     history: FuzzHistory = { locList: [], runResults: [] };
@@ -481,16 +493,22 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             </tbody>
                         </table>
                     ) : (
-                        <>
+                        <table><tr><td>
                             <span><b>Test Status:</b> {this.testCov.status}</span>
                             <table>
-                                {this.testCov.cov.split("\n").filter(row => row.length > 0).map(
-                                    (row, i) => <tr>{row.split(",").map(
-                                        e => i === 0 ? (<th>{e}</th>) : <td>{e}</td>
+                            {this.testCov.cov.split("\n").filter(row => row.length > 0).map(
+                                (row, i) => <tr>{row.split(",")
+                                    // Drop first column ("group")
+                                    .slice(1)
+                                    .map(
+                                        e => (i === 0)
+                                            // Special case first row (header)
+                                            ? <th>{capitalize(e.replace("_", " "))}</th>
+                                            : <td>{e}</td>
                                     )}</tr>)
-                                }
+                            }
                             </table>
-                        </>
+                        </td></tr></table>
                     )
                 }
             </>
