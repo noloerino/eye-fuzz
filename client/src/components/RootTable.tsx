@@ -53,10 +53,11 @@ enum ActiveTab {
 }
 
 export class RootTable extends MithrilTsxComponent<{ }> {
-    displayTypedEi: boolean = true;
+    displayTypedEi: boolean = false; // true;
     history: FuzzHistory = { locList: [], runResults: [] };
     currRunInfo: RunInfo = { eiTableData: [], genOutput: ""};
     newEiChoices: Map<LocIndex, number> = new Map();
+    newTypedChoices: Map<number, number> = new Map();
     showUnused: boolean = true;
     byteRender: ByteRender = ByteRender.DECIMAL;
     saveFileName: string | undefined;
@@ -119,6 +120,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             choice
         }));
         this.newEiChoices.clear();
+        this.newTypedChoices.clear();
         return m.request({
             method: "PATCH",
             url: SERVER_URL + "/ei",
@@ -450,7 +452,6 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                             <tbody>
                             <tr>
                                 <td>
-                                    <div style={{ overflow: "auto" }}>
                                     {this.displayTypedEi
                                         ? <EiTypedDisplay typedData={addTypeInfo(this.currRunInfo.eiTableData)}
                                                           locList={this.history.locList}
@@ -459,6 +460,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                           showUnused={this.showUnused}
                                                           renderer={(n, bounds?) => n == null ? "--" : renderNumber(n, this.byteRender, bounds)}
                                                           newEiChoices={this.newEiChoices}
+                                                          newTypedChoices={this.newTypedChoices}
                                                           classNameFilter={this.classNameFilter} />
                                         : <EiByteDisplay eiTableData={this.currRunInfo.eiTableData}
                                                          newEiChoices={this.newEiChoices}
@@ -469,7 +471,6 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                          renderer={(n) => n == null ? "--" : renderNumber(n, this.byteRender)}
                                                          classNameFilter={this.classNameFilter} />
                                     }
-                                    </div>
                                 </td>
                                 <td>
                                     <GenOutputDisplay currOutput={this.currRunInfo.genOutput}

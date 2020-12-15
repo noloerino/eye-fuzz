@@ -12,6 +12,7 @@ import {
     getByte,
     setByte,
 } from "../common";
+import {TOOLTIP_NEW_VALUE, TOOLTIP_STACK_TRACE, TOOLTIP_TYPE_INFO, TOOLTIP_USED} from "../tooltips";
 import {MithrilTsxComponent} from "mithril-tsx-component";
 
 type StackTraceCellAttrs = {
@@ -60,12 +61,12 @@ export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
             <table>
                 <thead>
                 <tr>
-                    <th scope="col">Stack Trace</th>
-                    <th scope="col">Used</th>
-                    <th scope="col">Type Info</th>
+                    <th scope="col" title={TOOLTIP_STACK_TRACE}>Stack Trace</th>
+                    <th scope="col" title={TOOLTIP_USED}>Used</th>
+                    <th scope="col" title={TOOLTIP_TYPE_INFO}>Type Info</th>
                     <th scope="col">Value {vnode.attrs.historyDepth} Run(s) Ago</th>
                     <th scope="col">Current Value</th>
-                    <th scope="col">New Value</th>
+                    <th scope="col" title={TOOLTIP_NEW_VALUE}>New Value</th>
                 </tr>
                 </thead>
                 <tbody id="eiTableBody">
@@ -81,7 +82,22 @@ export class EiByteDisplay extends MithrilTsxComponent<ByteDisplayAttrs> {
                                 <input type="checkbox" disabled={true} checked={used} />
                             </td>
                             <td>
-                                {JSON.stringify(typeInfo)}
+                                <span title={"The type this call to random() produced"}>
+                                    Data type: {typeInfo.kind}
+                                </span>
+                                <br />
+                                <span title={"The offset within the type that this byte accounted for"}>
+                                    Byte offset: {typeInfo.byteOffset}
+                                </span>
+                                {typeInfo.intBounds &&
+                                <>
+                                <br />
+                                <span title={"The inclusive minimum and exclusive maximum value for this call to random()"}>
+                                    Bounds:
+                                    [{vnode.attrs.renderer(typeInfo.intBounds.min)}, {vnode.attrs.renderer(typeInfo.intBounds.max)})
+                                </span>
+                                </>
+                                }
                             </td>
                             <td id="lessRecent" style={{textAlign: "center"}}>
                                 <span>{
@@ -132,6 +148,8 @@ type TypedDisplayAttrs = {
     history: FuzzHistory;
     historyDepth: number;
     historicChoices: Map<LocIndex, number | null>;
+    // Keeps track of choices made on types for convenience; should get converted to byte-level choices later
+    newTypedChoices: Map<number, number>;
     newEiChoices: Map<LocIndex, number>;
     classNameFilter: string;
     showUnused: boolean;
@@ -139,9 +157,6 @@ type TypedDisplayAttrs = {
 };
 
 export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
-    // Keeps track of choices made on types for convenience; should get converted to byte-level choices later
-    private newTypedChoices: Map<number, number> = new Map();
-
     view(vnode: Vnode<TypedDisplayAttrs, this>) {
         let historicChoices = vnode.attrs.historicChoices;
         let renderer = vnode.attrs.renderer;
@@ -198,13 +213,13 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                             </td>
                             <td style={{textAlign: "center"}}>
                                 <input type="number" min={intBounds?.min} max={intBounds?.max} value={
-                                    this.newTypedChoices.get(i)
-                                        ? (this.newTypedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
+                                    vnode.attrs.newTypedChoices.get(i)
+                                        ? (vnode.attrs.newTypedChoices.get(i)!! - (intBounds ? intBounds.min : 0))
                                             : ""}
                                         oninput={(e: InputEvent) => {
                                             let value = (e.target as HTMLInputElement)?.value ?? "";
                                             if (value === "") {
-                                                this.newTypedChoices.delete(i);
+                                                vnode.attrs.newTypedChoices.delete(i);
                                                 vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex) => {
                                                     vnode.attrs.newEiChoices.delete(eiIndex);
                                                 });
@@ -217,10 +232,10 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
                                                 }
                                                 if (intBounds)  {
                                                     // Offset by bounds - just add to min
-                                                    console.log(`getting ${v}, which will become ${v + intBounds.min}`)
+                                                    // console.log(`getting ${v}, which will become ${v + intBounds.min}`)
                                                     v += intBounds.min;
                                                 }
-                                                this.newTypedChoices.set(i, v);
+                                                vnode.attrs.newTypedChoices.set(i, v);
                                                 vnode.attrs.typedData[i].descendantIndices.forEach((eiIndex, ofs) => {
                                                     vnode.attrs.newEiChoices.set(eiIndex, getByte(v, ofs));
                                                 });
