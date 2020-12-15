@@ -18,39 +18,49 @@ abstract class ResponseHandler(val name: String) : HttpHandler {
         headers.add("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS")
         headers.add("Access-Control-Allow-Headers", "Access-Control-Allow-Origin,Content-Type")
         var response = ""
-        fun endResponse() {
+        var responseCode = 503
+        var responseLen: Long = -1
+        fun okResponse() {
             if (response.isEmpty()) {
-                httpExchange.sendResponseHeaders(204, -1)
+                responseCode = 204
+                responseLen = -1
             } else {
-                httpExchange.sendResponseHeaders(200, response.length.toLong())
+                responseCode = 200
+                responseLen = response.length.toLong()
             }
         }
         try {
             when (method) {
                 "GET" -> {
                     response = onGet()
-                    endResponse()
+                    okResponse()
                 }
                 "POST" -> {
                     BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPost(reader) }
-                    endResponse()
+                    okResponse()
                 }
                 "PATCH" -> {
                     BufferedReader(InputStreamReader(httpExchange.requestBody)).use { reader -> response = onPatch(reader) }
-                    endResponse()
+                    okResponse()
                 }
                 "OPTIONS" -> {
-                    httpExchange.sendResponseHeaders(204, -1)
+                    responseCode = 204
+                    responseLen = -1
                 }
-                else -> httpExchange.sendResponseHeaders(501, 0)
+                else -> {
+                    responseCode = 501
+                    responseLen = 0
+                }
             }
-            httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
         } catch (e: Exception) {
             eprintln("Exception in handling $method /$name")
-            e.printStackTrace()
-            httpExchange.sendResponseHeaders(503, 0)
-            exitProcess(1)
+            eprintln(e.stackTraceToString())
+            responseCode = 503
+            responseLen = 0
+            response = ""
         } finally {
+            httpExchange.sendResponseHeaders(responseCode, responseLen)
+            httpExchange.responseBody.use { out -> out.write(response.toByteArray()) }
             httpExchange.close()
         }
     }

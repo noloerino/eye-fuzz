@@ -190,7 +190,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             url: SERVER_URL + "/load_input",
         })
             .then((files: string[]) => {
-                this.availableLoadFiles = files;
+                this.availableLoadFiles = files.sort();
             });
     }
 
@@ -200,7 +200,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
             url: SERVER_URL + "/load_session",
         })
             .then((files: string[]) => {
-                this.availableLoadSessions = files;
+                this.availableLoadSessions = files.sort();
             });
     }
 
@@ -234,7 +234,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                             method: "POST",
                                             url: SERVER_URL + "/save_input",
                                             body: {fileName: saveFileName},
-                                        }).then(() => console.log("Saved file", saveFileName, "(probably)"));
+                                        })
+                                            .then(() => this.getLoadFiles())
+                                            .then(() => console.log("Saved file", saveFileName));
                                         this.saveFileName = undefined;
                                     }}>
                                         <label>
@@ -256,7 +258,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                                 body: {fileName: loadFileName},
                                             })
                                                 .then(() => console.log("Loaded file", loadFileName))
-                                                .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadSessions()]));
+                                                .then(() => Promise.all([this.getEiAndGenOutput(), this.getLoadFiles()]));
                                             this.loadFileName = undefined;
                                         }
                                     }}>
@@ -364,7 +366,9 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                             method: "POST",
                                             url: SERVER_URL + "/save_session",
                                             body: {fileName: saveFileName},
-                                        }).then(() => console.log("Saved session", saveFileName, "(probably)"));
+                                        })
+                                            .then(() => this.getLoadSessions())
+                                            .then(() => console.log("Saved session", saveFileName));
                                         this.saveSessionName = undefined;
                                     }}>
                                         <label>
