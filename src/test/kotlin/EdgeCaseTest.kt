@@ -12,7 +12,7 @@ class EdgeCaseTest {
     class OneLineIntGenerator : Generator<Int>(Int::class.java) {
         override fun generate(random: SourceOfRandomness, status: GenerationStatus): Int {
             // These must be on the same line
-            return makeInt(random.nextInt(0, 0x10000), random.nextInt(0, 0x10000))
+            return makeInt(random.nextInt(), random.nextInt())
         }
 
         // Takes a as upper 2 bytes and b as lower 2 bytes
@@ -22,10 +22,9 @@ class EdgeCaseTest {
     class TwoLineIntGenerator : Generator<Int>(Int::class.java) {
         override fun generate(random: SourceOfRandomness, status: GenerationStatus): Int {
             // These must be on different lines
-            return makeInt(
-                    random.nextInt(0, 0x10000),
-                    random.nextInt(0, 0x10000)
-            )
+            val v1 = random.nextInt()
+            val v2 = random.nextInt()
+            return makeInt(v1, v2)
         }
 
         // Takes a as upper 2 bytes and b as lower 2 bytes

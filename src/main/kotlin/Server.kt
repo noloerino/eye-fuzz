@@ -402,7 +402,7 @@ class Server<T>(private val gen: Generator<T>,
         println("generator produced: " + getGenContents())
     }
 
-    val saveInputDir = File("savedInputs")
+    val saveInputDir = File("saved_inputs")
     init {
         assert(saveInputDir.isDirectory || saveInputDir.mkdirs()) {
             "Unable to create saved input directory at ${saveInputDir.canonicalPath}"
@@ -449,7 +449,7 @@ class Server<T>(private val gen: Generator<T>,
         }
     }
 
-    val saveSessionDir = File("savedSessions")
+    val saveSessionDir = File("saved_sessions")
     init {
         assert(saveSessionDir.isDirectory || saveSessionDir.mkdirs()) {
             "Unable to create saved session directory at ${saveSessionDir.canonicalPath}"

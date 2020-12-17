@@ -64,7 +64,7 @@ input to the test method in the "Test Status" field - an input that fails test p
 
 ### Replaying a JQF/Zest-Generated Input
 To load an input (whether previously saved by eye-fuzz or produced by a Zest fuzzing session), drag the file into the
-`savedInputs` directory. After refreshing the page, select the file name from the "Load input file" dropdown and hit
+`saved_inputs` directory. After refreshing the page, select the file name from the "Load input file" dropdown and hit
 `Load`.
 
 ## Settings and Controls
@@ -73,9 +73,9 @@ To load an input (whether previously saved by eye-fuzz or produced by a Zest fuz
 - _Save last input to file_: Saves the sequence of bytes that produced the last generator result to a file. This
     file is just a binary sequence that can be fed to any generator, and can be used with Zest's ReproGuidance.
     
-    The file is saved in the `savedInputs` directory.
-- _Load input file_: Loads a sequence of bytes to be used for a generator from a file in the `savedInputs` directory.
-    To load a file from elsewhere in your filesystem, move or copy it into the `savedInputs` folder and refresh the page.
+    The file is saved in the `saved_inputs` directory.
+- _Load input file_: Loads a sequence of bytes to be used for a generator from a file in the `saved_inputs` directory.
+    To load a file from elsewhere in your filesystem, move or copy it into the `saved_inputs` folder and refresh the page.
     
 ### Test Coverage Controls
 - _Rerun test case_: Reruns the test case using the most recent generator output, updating the collected coverage data.
@@ -109,7 +109,7 @@ in values and generator outputs made by the user.
 - _Save current session to file_: Saves the whole history of choices made for the duration of a fuzzing session
     to a JSON file with the specified name (the `.json` extension is not automatically applied).
     
-    The file is saved in the `savedSessions` directory.
+    The file is saved in the `saved_sessions` directory.
 - _Load session from file_: Loads a history of choices from a JSON file, as produced by the "Save current session"
     command. This replaces the current fuzzing session, and the generator will be rerun once to ensure consistency.
     
@@ -123,6 +123,7 @@ except the following:
 - `nextBigInteger`
 - `nextInstant`
 - `nextDuration`
+
 Additionally, the following methods can be manipulated at the byte level by the frontend, but are not displayed properly
 with type or bounds information:
 - `nextBytes`
@@ -133,7 +134,7 @@ with type or bounds information:
 If your use case requires support for any of these methods, please file an issue.
 
 ### Multiple lines with the same stack trace
-Because it is impossible for Java to distinguish between function calls with identical stack traces, `eye-fuzz` may
+Because it is impossible to distinguish between function calls with identical stack traces, `eye-fuzz` may
 encounter unexpected behavior in tracking history when faced with such a scenario (behavior for modifying and generating
 new bytes should be unaffected). Identical stack traces may occur if two calls to the same `Random` method are placed on
 the same line (for example, `f(randInt(), randInt()))`), or if a `Random` method call occurs in the body of a for loop.
