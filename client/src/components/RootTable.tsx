@@ -304,7 +304,7 @@ export class RootTable extends MithrilTsxComponent<{ }> {
                                             this.testCov = result;
                                         })
                                 }>
-                                    Rerun Test Case
+                                    Rerun test case
                                 </button>
                             </td>
 

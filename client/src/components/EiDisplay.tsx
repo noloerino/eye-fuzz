@@ -269,5 +269,4 @@ export class EiTypedDisplay extends MithrilTsxComponent<TypedDisplayAttrs> {
             </table>
         );
     }
-
 }
