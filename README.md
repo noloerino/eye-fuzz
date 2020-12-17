@@ -69,6 +69,7 @@ To load an input (whether previously saved by eye-fuzz or produced by a Zest fuz
 
 ## Settings and Controls
 ### Generator Controls
+![Generator Controls](/demo_images/gen-settings.jpg)
 - _Rerun generator_: Reruns the generator with the new values specified.
 - _Save last input to file_: Saves the sequence of bytes that produced the last generator result to a file. This
     file is just a binary sequence that can be fed to any generator, and can be used with Zest's ReproGuidance.
@@ -78,9 +79,11 @@ To load an input (whether previously saved by eye-fuzz or produced by a Zest fuz
     To load a file from elsewhere in your filesystem, move or copy it into the `saved_inputs` folder and refresh the page.
     
 ### Test Coverage Controls
+![Test Controls](/demo_images/test-settings.jpg)
 - _Rerun test case_: Reruns the test case using the most recent generator output, updating the collected coverage data.
 
 ### View Settings
+![View Controls](/demo_images/view-settings.jpg)
 These options control how program locations and their corresponding values are displayed and formatted.
 - _Show type-level decisions_: When checked, instead of displaying a single entry for each individual byte, a
     single row is displayed for each call to a `Random` method.
@@ -102,6 +105,7 @@ These options control how program locations and their corresponding values are d
     runs, while hitting the right arrow shows progressively newer ones.
     
 ### Session Controls
+![Session Controls](/demo_images/session-settings.jpg)
 These options let you save, load, and reset an `eye-fuzz` fuzzing session, which captures the full history of changes
 in values and generator outputs made by the user.
 - _Restart from scratch_: Hitting this button completely resets the state of your fuzzing session. The generator will
@@ -143,3 +147,8 @@ the same line (for example, `f(randInt(), randInt()))`), or if a `Random` method
 If a generator caches intermediate computations that invoke `Random` methods, then rerunning the generator twice with
 the same underlying byte stream may produce different results (this is a limitation of JQF as well). More broadly, any
 generator whose output is not solely a function of the input pseudorandom byte stream will exhibit this behavior.
+
+### Custom serializers for generators
+Currently, the generator output displayed on the frontend is simply the result of calling `toString()` on the produced
+object (truncated to 1024 characters). Custom serialization functions are supported but not yet exposed to the
+command-line interface - please file an issue if this is a feature you need.
