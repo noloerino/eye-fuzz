@@ -5,9 +5,9 @@ typealias Choice = Int
 
 /**
  * Because stack traces are not unique if you have two function calls on the same line, we need to add
- * a count variable to track ints. This isn't as strong as Zest ExecutionIndexing, but it's a weak substitute.
+ * a count variable to track. This isn't as strong as Zest ExecutionIndexing, but it's a weak substitute.
  *
- * If count is 0, that means this was the first occurrence of the provided stack trace on this run.
+ * If count is 0, that means this was the first occurrence of the (stack trace, byte type info) pair on this run.
  */
 @Serializable
 data class StackTraceInfo(val stackTrace: StackTrace, val typeInfo: ByteTypeInfo, val count: Int)

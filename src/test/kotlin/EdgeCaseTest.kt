@@ -40,18 +40,18 @@ class EdgeCaseTest {
         val fileName = "__TEST_LE"
         testServer(TwoLineIntGenerator(), "IntTestDriver", "testDummy", listOf()) { server ->
             // IntGenerator produces 2 ints and combines their lower 2 bytes together
-            // Combining 0xCCCCDEAD (generated first) with 0xCCCCBEEF will give us 0xDEADBEEF.
-            server.newSavedInput(fileName,
-                    // These literals get converted to ints, so this saves some keystrokes
-                    intArrayOf(0xAD, 0xDE, 0xCC, 0xCC, 0xEF, 0xBE, 0xCC, 0xCC)
-                            .map { it.toByte() }
-                            .toByteArray())
+            // Combining 0xCCCC0EAD (generated first) with 0xCCCCBEEF will give us 0x0EADBEEF.
+            // These literals get converted to ints, so this saves some keystrokes
+            val bytes = intArrayOf(0xAD, 0x0E, 0xCC, 0xCC, 0xEF, 0xBE, 0xCC, 0xCC)
+                    .map { it.toByte() }
+                    .toByteArray()
+            server.newSavedInput(fileName, bytes)
             val loadHandler = server.getResponseHandler("load_input")
             val fileList = Json.decodeFromString<List<String>>(loadHandler.onGet())
             assertTrue(fileList.contains(fileName), "didn't find saved input $fileName in reported $fileList")
             assertEquals("OK", loadHandler.postJson(Server.SaveLoadRequest(fileName)))
             val genHandler = server.getResponseHandler("generator")
-            assertEquals(0xDEADBEEF.toInt().toString(), genHandler.postString(""))
+            assertEquals(0x0EADBEEF, genHandler.postString("").toInt())
         }
     }
 

@@ -13,7 +13,22 @@ enum class ChoiceKind {
     FLOAT,
     INT,
     LONG,
-    SHORT
+    SHORT;
+}
+
+fun ChoiceKind.byteCount(): Int {
+    return when (this) {
+        ChoiceKind.BOOLEAN -> 1
+        ChoiceKind.BYTE -> 1
+        ChoiceKind.BYTE_ARRAY -> TODO()
+        ChoiceKind.CHAR -> 2
+        ChoiceKind.CHOOSE -> 4
+        ChoiceKind.DOUBLE -> 8
+        ChoiceKind.FLOAT -> 4
+        ChoiceKind.INT -> 4
+        ChoiceKind.LONG -> 8
+        ChoiceKind.SHORT -> 2
+    }
 }
 
 /**
@@ -112,36 +127,38 @@ class AnnotatingRandomSource(delegate: StreamBackedRandom) : FastSourceOfRandomn
     /**
      * Maps stack traces to the number of times the same stack trace was seen during a run.
      */
-    private val seenStackTraces = mutableMapOf<StackTrace, Int>()
+    private val seenLocations = mutableMapOf<Pair<StackTrace, ByteTypeInfo>, Int>()
 
     /**
      * Returns an object representing type information for the last retrieved byte.
      *
      * This function is not idempotent, as it also updates information about the byte offset.
-     * For example, it may be called 4 times for generating an Int (once for each possible byte offset).
+     * For example, it may be called 4 times with the same stack trace for generating an Int (once for each possible
+     * byte offset).
      */
     fun consumeNextStackTraceInfo(): StackTraceInfo {
         val s = choiceState!!
-        val count = if (seenStackTraces.containsKey(s.stackTrace)) {
-            val n = seenStackTraces[s.stackTrace]!!
+        val currInfo = ByteTypeInfo(s.currType, s.currOfs++, s.currBounds)
+        val key = Pair(s.stackTrace, currInfo)
+        val count = if (seenLocations.containsKey(key)) {
+            val n = seenLocations[key]!!
             // Only report once to avoid flooding
-            if (n == 1) {
-                eprintln("WARNING: Found random() function calls with identical stack trace:")
+            // We know something's gone awry if the number of calls exceeds the expected number of bytes
+            if (n == 1 && !reportedIdenticalStackTrace) {
+                eprintln("WARNING: Found Random function calls with identical stack trace:")
                 s.stackTrace.forEach { eprintln("\t$it") }
-                if (!reportedIdenticalStackTrace) {
-                    reportedIdenticalStackTrace = true
-                    eprintln("=== Distinct function calls with different stack traces may break history reproduction.")
-                    eprintln("=== If possible, consider separating calls to random() within the generator onto different lines.")
-                }
+                reportedIdenticalStackTrace = true
+                eprintln("=== Distinct function calls with different stack traces may break history reproduction.")
+                eprintln("=== If possible, consider separating calls to random() within the generator onto different lines.")
             }
             n
         } else {
             0
         }
-        seenStackTraces[s.stackTrace] = count + 1
+        seenLocations[key] = count + 1
         return StackTraceInfo(
                 s.stackTrace,
-                ByteTypeInfo(s.currType, s.currOfs++, s.currBounds),
+                currInfo,
                 count
         )
     }
